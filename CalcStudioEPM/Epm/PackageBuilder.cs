@@ -167,6 +167,81 @@ namespace CalcStudioEPM.Epm
             }
         }
 
+        /// <summary>
+        /// A Calculation Manager-only package holding one RuleSet, already put together by
+        /// <see cref="RuleSet.Assemble"/>:
+        ///   CALC-Calculation Manager/resource/Planning/{application}/RuleSets/{ruleSetName}
+        /// </summary>
+        public static byte[] BuildRuleSet(string application, string ruleSetName, string ruleSetXml,
+                                          string username, string localFolder)
+        {
+            if (string.IsNullOrWhiteSpace(application)) throw new ArgumentException(nameof(application));
+            if (string.IsNullOrWhiteSpace(ruleSetName)) throw new ArgumentException(nameof(ruleSetName));
+            if (string.IsNullOrWhiteSpace(ruleSetXml))  throw new ArgumentException(nameof(ruleSetXml));
+
+            const string calcFolder = "CALC-Calculation Manager";
+            string parentPath = $"/Planning/{application}/{RuleSet.FolderName}";
+            string now  = DateTime.UtcNow.ToString("yyyyMMdd");
+            string time = DateTime.UtcNow.ToString("HH:mm");
+            string exportedVersion = ReadExportedVersion(localFolder);
+            string artifact = $@"<Artifact recursive=""false"" parentPath=""{XmlAttr(parentPath)}"" pattern=""{XmlAttr(ruleSetName)}""/>";
+
+            using (var ms = new MemoryStream())
+            {
+                using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    Add(zip, "Export.xml",
+$@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<Package>
+   <LOCALE>en_GB</LOCALE>
+   <User name="""" password=""""/>
+   <Task>
+      <Source type=""Application"" product=""CALC"" project=""Foundation"" application=""Calculation Manager""/>
+      <Target type=""FileSystem"" filePath=""/{calcFolder}""/>
+      {artifact}
+   </Task>
+</Package>");
+                    Add(zip, "Import.xml",
+$@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<Package>
+   <LOCALE>en_GB</LOCALE>
+   <User name="""" password=""""/>
+   <ExportedVersion>{XmlVal(exportedVersion)}</ExportedVersion>
+   <ExportedDateUTC>{XmlVal(now)}</ExportedDateUTC>
+   <ExportedTimeUTC>{XmlVal(time)}</ExportedTimeUTC>
+   <ExportedBy>{XmlVal(username)}</ExportedBy>
+   <IDMDomain></IDMDomain>
+   <ServiceInstance></ServiceInstance>
+   <Task>
+      <Source type=""FileSystem"" filePath=""/{calcFolder}""/>
+      <Target type=""Application"" product=""CALC"" project=""Foundation"" application=""Calculation Manager""/>
+      {artifact}
+   </Task>
+</Package>");
+                    Add(zip, $"{calcFolder}/Import.xml",
+                        BuildScopedImportXml("CALC", "Foundation", "Calculation Manager", parentPath, ruleSetName,
+                                             username, exportedVersion, now, time));
+
+                    string ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+                    string Folder(string name, string path) =>
+                        $@"<folder name=""{XmlAttr(name)}"" type=""Folder"" size="""" id="""" path=""{XmlAttr(path)}"" pathAlias="""" modifiedBy="""" lastUpdated="""" description="""" />";
+                    Add(zip, $"{calcFolder}/info/listing.xml",
+                        @"<?xml version=""1.0"" encoding=""utf-8""?><artifactListing>" +
+                        $@"<resource name=""{XmlAttr(ruleSetName)}"" id=""{XmlAttr(ruleSetName)}"" type=""RuleSet"" cloneOnly=""false"" size="""" " +
+                        $@"path=""{XmlAttr(parentPath)}"" pathAlias=""{XmlAttr(parentPath)}"" modifiedBy="""" lastUpdated=""{ts}"" description="""" />" +
+                        Folder("Planning", "/Planning") +
+                        Folder(application, $"/Planning/{application}") +
+                        Folder(RuleSet.FolderName, parentPath) +
+                        "</artifactListing>");
+                    Add(zip, $"{calcFolder}/info/sourceInfo.xml", ReadOrBuildCalcSourceInfo(localFolder, calcFolder));
+
+                    Add(zip, $"{calcFolder}/resource/Planning/{application}/{RuleSet.FolderName}/{PathConstants.ToFileName(ruleSetName)}",
+                        ruleSetXml);
+                }
+                return ms.ToArray();
+            }
+        }
+
         // ------------------------------------------------------------------ //
         //  Deployed version (the pulled CALC artifact, refreshed after each deploy)
         // ------------------------------------------------------------------ //

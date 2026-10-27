@@ -50,6 +50,7 @@ namespace CalcStudioEPM.Epm
                                      .Select(Path.GetDirectoryName).ToList();
             foreach (string dir in graphical)
             {
+                if (GraphicalRule.IsTemplateFolder(dir)) continue;             // read only, never deployed
                 string rel = Rel(root, dir);
                 string xmlPath = Path.Combine(resources, rel);                 // the folder is named like the artifact file
                 List<string> changed = null;
@@ -76,6 +77,22 @@ namespace CalcStudioEPM.Epm
                 if (IsLocalCopy(f) || Path.GetFileName(f).StartsWith(".") ||          // .epm_workspace and other helpers
                     graphical.Any(g => f.StartsWith(g + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))) continue;
                 string rel = Rel(root, f);
+                if (RuleSet.IsRuleSetIni(f))
+                {
+                    // A RuleSet's .ini vs the definition in its pulled XML
+                    string name = Path.GetFileName(f);
+                    string setXml = Path.Combine(resources, Path.GetDirectoryName(rel) ?? "", name.Substring(0, name.Length - RuleSet.IniSuffix.Length));
+                    if (!File.Exists(setXml)) { result.Add(new Change { File = f, Relative = rel, Reason = "not in the last pull" }); continue; }
+                    bool changedSet;
+                    try
+                    {
+                        XElement def = RuleSet.Definition(XDocument.Load(setXml), PathConstants.FromFileName(name.Substring(0, name.Length - RuleSet.IniSuffix.Length)));
+                        changedSet = def == null || RuleSet.ApplyIni(new XElement(def), File.ReadAllText(f, Encoding.UTF8), name).Count > 0;
+                    }
+                    catch { changedSet = true; }                              // can't be read back: it was edited
+                    if (changedSet) result.Add(new Change { File = f, Relative = rel, Reason = "changed" });
+                    continue;
+                }
                 string xmlPath = Path.Combine(resources, Path.GetDirectoryName(rel) ?? "", Path.GetFileNameWithoutExtension(f));
                 if (!File.Exists(xmlPath))
                 {

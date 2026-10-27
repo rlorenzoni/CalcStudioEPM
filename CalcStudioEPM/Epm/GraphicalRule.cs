@@ -56,6 +56,8 @@ namespace CalcStudioEPM.Epm
         {
             public string Rule { get; set; }
             public int    Version { get; set; } = 1;
+            /// <summary>A graphical template's folder: read only, never deployed from here.</summary>
+            public bool   Template { get; set; }
             public Dictionary<string, FileEntry> Files { get; set; } = new Dictionary<string, FileEntry>();
             public Dictionary<string, SectionEntry> Sections { get; set; } = new Dictionary<string, SectionEntry>();
         }
@@ -70,8 +72,9 @@ namespace CalcStudioEPM.Epm
 
         private sealed class SectionEntry
         {
-            public string Kind { get; set; }          // globalrange | loop | memberblock | if
+            public string Kind { get; set; }          // globalrange | loop | memberblock | if | template | templateslice
             public string Path { get; set; }          // statement path, e.g. "1/1/then/2"
+            public string Prompt { get; set; }        // templateslice: the member-range prompt's name
         }
 
         // ------------------------------------------------------------------ //
@@ -83,50 +86,153 @@ namespace CalcStudioEPM.Epm
         /// metadata): every FIX and the global range list them all, empty when not used. Null =
         /// only the dimensions the rule uses.</param>
         public static int Extract(XDocument doc, string ruleName, string folder, IProgress<string> log,
-                                  IList<string> cubeDimensions = null)
+                                  IList<string> cubeDimensions = null) =>
+            ExtractOwner(doc, RuleElement(doc), ruleName, folder, log, cubeDimensions, template: false);
+
+        public const string TemplateIniName = "00 - Template.ini";
+
+        /// <summary>The template named <paramref name="name"/> in a template's file (which also
+        /// embeds the templates it calls).</summary>
+        public static XElement TemplateElement(XDocument doc, string name) =>
+            doc.Root?.Element("templates")?.Elements("template")
+               .FirstOrDefault(t => string.Equals((string)t.Attribute("name"), name, StringComparison.OrdinalIgnoreCase));
+
+        public static bool IsGraphicalTemplate(XDocument doc, string name) => TemplateElement(doc, name)?.Element("statement") != null;
+
+        /// <summary>
+        /// Writes a graphical template's folder, read only: its steps and 00 - Template.ini (its
+        /// flow and design-time prompts). Templates are changed in Calculation Manager; rules pass
+        /// values to their prompts in their own 00 - Rule.ini.
+        /// </summary>
+        public static int ExtractTemplate(XDocument doc, string name, string folder, IProgress<string> log,
+                                          IList<string> cubeDimensions = null) =>
+            ExtractOwner(doc, TemplateElement(doc, name), name, folder, log, cubeDimensions, template: true);
+
+        private static int ExtractOwner(XDocument doc, XElement rule, string ruleName, string folder, IProgress<string> log,
+                                        IList<string> cubeDimensions, bool template)
         {
-            XElement rule = RuleElement(doc);
             if (folder.Length > 230)
                 throw new EpmException($"the folder path is too long for Windows ({folder.Length} characters): use a shorter local folder.");
             Directory.CreateDirectory(folder);
-            var w = new Extractor { Folder = folder, RuleName = ruleName, Log = log, CubeDimensions = cubeDimensions };
+            var w = new Extractor { Folder = folder, RuleName = ruleName, Log = log, CubeDimensions = cubeDimensions, Doc = doc, Template = template };
             w.Manifest.Rule = ruleName;
+            w.Manifest.Template = template;
 
             XElement global = rule.Element("globalrange");
             if (global != null)
             {
                 var dims = w.AllDimensions(SliceOf(global));
                 w.Flow.Add($";  Global range  FIX ({string.Join(", ", dims.Where(d => d.Value.Length > 0).Select(d => $"{d.Key} = {d.Value}"))})");
-                w.Sections.Add(("Global range", dims));
+                w.Sections.Add(("Global range", new List<string>(), dims));
                 w.Manifest.Sections["Global range"] = new SectionEntry { Kind = "globalrange", Path = "globalrange" };
             }
             w.Walk(rule.Elements("statement"), "", "", 0);
 
-            var ini = new List<string>
+            var ini = template
+                ? new List<string>
+                {
+                    $"; {ruleName} — graphical template · {Prop(rule, "application")} / {Prop(rule, "plantype")}  (READ ONLY)",
+                    "; Templates are changed in Calculation Manager: these files show what this one does. Rules",
+                    "; pass values to its design-time prompts in their own 00 - Rule.ini.",
+                    ";",
+                }
+                : new List<string>
+                {
+                    $"; {ruleName} — graphical rule · {Prop(rule, "application")} / {Prop(rule, "plantype")}",
+                    "; The steps and their order are changed in Calculation Manager. Here you can change",
+                    "; the values in the [sections] below; each step's code is in its numbered file.",
+                    "; Under each FIX, one line per dimension of the cube: Dimension = members (empty = not fixed).",
+                    "; Under each template step, the values it passes to the template's design-time prompts.",
+                    "; Deploy (from any of these files) sends the rule to Calculation Manager only:",
+                    "; deploy it to Planning from Calculation Manager.",
+                    ";",
+                };
+            if (template)
             {
-                $"; {ruleName} — graphical rule · {Prop(rule, "application")} / {Prop(rule, "plantype")}",
-                "; The steps and their order are changed in Calculation Manager. Here you can change",
-                "; the values in the [sections] below; each step's code is in its numbered file.",
-                "; Under each FIX, one line per dimension of the cube: Dimension = members (empty = not fixed).",
-                "; Deploy (from any of these files) sends the rule to Calculation Manager only:",
-                "; deploy it to Planning from Calculation Manager.",
-                ";",
-                "; Flow",
-            };
+                var defs = rule.Element("template_prompts")?.Elements().Where(p => (string)p.Attribute("type") != "Separator").ToList();
+                if (defs?.Count > 0)
+                {
+                    ini.Add("; Design-time prompts");
+                    int width = defs.Max(p => ((string)p.Attribute("name") ?? "").Length);
+                    foreach (XElement p in defs)
+                    {
+                        string value = p.Element("value")?.Value;
+                        ini.Add($";   {((string)p.Attribute("name") ?? "").PadRight(width)}  {PromptDescription(p, p)}" +
+                                (string.IsNullOrEmpty(value) ? "" : $"  · default {OneLine(value)}"));
+                    }
+                    ini.Add(";");
+                }
+            }
+            ini.Add("; Flow");
             ini.AddRange(w.Flow);
             ini.Add("");
-            foreach (var (title, values) in w.Sections)
+            foreach (var (title, notes, values) in w.Sections)
             {
                 ini.Add($"[{title}]");
-                int width = values.Count == 0 ? 0 : values.Max(v => v.Key.Length);
-                ini.AddRange(values.Select(v => $"{v.Key.PadRight(width)} = {v.Value}"));
+                ini.AddRange(notes);
+                var real = values.Where(v => !IsNote(v)).ToList();
+                int width = real.Count == 0 ? 0 : real.Max(v => v.Key.Length);
+                ini.AddRange(values.Select(v => IsNote(v) ? v.Key : $"{v.Key.PadRight(width)} = {v.Value}"));
                 ini.Add("");
             }
-            WriteText(Path.Combine(folder, RuleIniName), string.Join("\n", ini));
+            string iniPath = Path.Combine(folder, template ? TemplateIniName : RuleIniName);
+            WriteText(iniPath, string.Join("\n", ini));
             WriteText(Path.Combine(folder, ManifestName), JsonConvert.SerializeObject(w.Manifest, Formatting.Indented));
-            foreach (string ro in w.ReadOnlyFiles)
+            IEnumerable<string> readOnly = template
+                ? w.Manifest.Files.Keys.Select(f => Path.Combine(folder, f)).Concat(new[] { iniPath })
+                : w.ReadOnlyFiles;
+            foreach (string ro in readOnly)
                 try { File.SetAttributes(ro, File.GetAttributes(ro) | FileAttributes.ReadOnly); } catch { }
             return w.Manifest.Files.Count + 1;
+        }
+
+        /// <summary>A comment line among a section's values (written as is, never read back).</summary>
+        private static bool IsNote(KeyValuePair<string, string> v) => v.Key.StartsWith(";", StringComparison.Ordinal);
+
+        /// <summary>
+        /// "Restricted List: Tangible | Intangible, asked at run time" — a design-time prompt's
+        /// type, its allowed values (from the template's definition) and whether it's a run-time prompt.
+        /// </summary>
+        private static string PromptDescription(XElement prompt, XElement definition)
+        {
+            string type = (string)prompt.Attribute("type") ?? "";
+            var allowed = definition?.Elements("restricted_prompt_item").Select(i => Prop(i, "prompt")).Where(s => s.Length > 0).ToList();
+            string asked = (string)prompt.Attribute("isPrompt");
+            return type +
+                   (allowed?.Count > 0 ? ": " + string.Join(" | ", allowed) : "") +
+                   (asked == "true" || asked == "yes" ? ", asked at run time" : "");
+        }
+
+        /// <summary>A graphical template's folder (pulled read only).</summary>
+        public static bool IsTemplateFolder(string folder)
+        {
+            try { return JsonConvert.DeserializeObject<Manifest>(File.ReadAllText(Path.Combine(folder, ManifestName), Encoding.UTF8))?.Template == true; }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// A test for files that stay read only even when a connection's Read only box is
+        /// unticked: every file of a template's folder, and the formula steps this format can't
+        /// hold. Reads each folder's manifest once.
+        /// </summary>
+        public static Func<string, bool> AlwaysReadOnly()
+        {
+            var cache = new Dictionary<string, Manifest>(StringComparer.OrdinalIgnoreCase);
+            return file =>
+            {
+                string dir = Path.GetDirectoryName(file) ?? "";
+                if (!cache.TryGetValue(dir, out Manifest m))
+                {
+                    string path = Path.Combine(dir, ManifestName);
+                    try { m = File.Exists(path) ? JsonConvert.DeserializeObject<Manifest>(File.ReadAllText(path, Encoding.UTF8)) : null; }
+                    catch { m = null; }
+                    cache[dir] = m;
+                }
+                if (m == null) return false;
+                string name = Path.GetFileName(file);
+                if (m.Template) return name != ManifestName;
+                return m.Files.TryGetValue(name, out FileEntry e) && !e.Editable;
+            };
         }
 
         private sealed class Extractor
@@ -134,6 +240,8 @@ namespace CalcStudioEPM.Epm
             public string Folder, RuleName;
             public IProgress<string> Log;
             public IList<string> CubeDimensions;
+            public XDocument Doc;
+            public bool Template;          // a template's folder: all read only, so no per-step notes
 
             /// <summary>The cube's dimensions in order with the rule's selections ("" = none),
             /// then any dimension of the rule the cube list doesn't have.</summary>
@@ -147,8 +255,8 @@ namespace CalcStudioEPM.Epm
             }
             public readonly Manifest Manifest = new Manifest();
             public readonly List<string> Flow = new List<string>();
-            public readonly List<(string Title, List<KeyValuePair<string, string>> Values)> Sections =
-                new List<(string, List<KeyValuePair<string, string>>)>();
+            public readonly List<(string Title, List<string> Notes, List<KeyValuePair<string, string>> Values)> Sections =
+                new List<(string, List<string>, List<KeyValuePair<string, string>>)>();
             public readonly List<string> ReadOnlyFiles = new List<string>();
 
             /// <summary>"{num} - {label}{ext}", the label shortened to keep the full path under
@@ -172,11 +280,15 @@ namespace CalcStudioEPM.Epm
                     string pad  = new string(' ', depth * 2);
                     string type = (string)st.Attribute("type");
                     string kind = type == "component" ? (string)st.Attribute("kind") : type;
+                    // A disabled step (property "disabled" on its component, loop …) is skipped by EPM
+                    string off = st.Elements().Any(e => Prop(e, "disabled") == "true") ? "  (disabled)" : "";
 
                     if (kind == "script" || kind == "formula")
                     {
                         XElement comp = st.Element("component");
                         string caption = Prop(comp, "caption");
+                        // A step that runs only when its condition on design-time prompts holds
+                        string when = comp.Element("test") != null ? $"  when {Condition(comp.Element("test"))}" : "";
                         string label = string.IsNullOrWhiteSpace(caption) ? (kind == "script" ? "Script" : "Formula") : caption;
                         string file = FileName(num, label, kind == "script" ? ".csc" : FormulaExt);
                         var entry = new FileEntry { Step = num, Type = kind, ComponentId = (string)comp.Attribute("id") };
@@ -187,7 +299,7 @@ namespace CalcStudioEPM.Epm
                             FormulaModel model = FormulaModel.FromXml(comp);
                             string text = model.Render(RuleName);
                             entry.Editable = FormulaModel.RoundTrips(comp, text);
-                            if (!entry.Editable)
+                            if (!entry.Editable && !Template)
                             {
                                 text = "/* READ ONLY: this formula step has settings this file format can't hold, so it is edited\n" +
                                        "   in Calculation Manager only. */\n" + text;
@@ -199,7 +311,7 @@ namespace CalcStudioEPM.Epm
                         Manifest.Files[file] = entry;
                         Flow.Add($";  {pad}{num}  {(kind == "script" ? "Script" : "Formula")}" +
                                  (string.IsNullOrWhiteSpace(caption) ? "" : $" «{caption}»") + $"  →  {file}" +
-                                 (entry.Editable ? "" : "  (read only)"));
+                                 (entry.Editable || Template ? "" : "  (read only)") + when + off);
                     }
                     else if (kind == "loop")
                     {
@@ -207,7 +319,7 @@ namespace CalcStudioEPM.Epm
                         var used = SliceOf(loop?.Element("test")?.Element("expression")?.Element("source"));
                         string caption = Prop(loop, "caption");
                         Flow.Add($";  {pad}{num}  FIX" + (string.IsNullOrWhiteSpace(caption) ? "" : $" «{caption}»") +
-                                 $"  ({string.Join(", ", used.Where(d => d.Value.Length > 0).Select(d => d.Key))})");
+                                 $"  ({string.Join(", ", used.Where(d => d.Value.Length > 0).Select(d => d.Key))}){off}");
                         AddSection($"{num} FIX", AllDimensions(used), "loop", here);
                         Walk(loop?.Elements("statement") ?? Enumerable.Empty<XElement>(), num + ".", here + "/", depth + 1);
                     }
@@ -215,16 +327,18 @@ namespace CalcStudioEPM.Epm
                     {
                         XElement mb = st.Element("memberblock");
                         string member = Prop(mb, "memberblock");
-                        Flow.Add($";  {pad}{num}  Member block  {member.Trim()}( … )");
+                        Flow.Add($";  {pad}{num}  Member block  {member.Trim()}( … ){off}");
                         AddSection($"{num} Member block", new List<KeyValuePair<string, string>> { Kv("Member", member.Trim()) }, "memberblock", here);
                         Walk(mb?.Elements("statement") ?? Enumerable.Empty<XElement>(), num + ".", here + "/", depth + 1);
                     }
                     else if (kind == "if")
                     {
                         XElement iff = st.Element("if");
-                        string test = UserInput(iff?.Element("test")) ?? "";
-                        Flow.Add($";  {pad}{num}  IF ({test.Trim()})");
-                        AddSection($"{num} IF", new List<KeyValuePair<string, string>> { Kv("Test", test.Trim()) }, "if", here);
+                        // A typed test (user_inp) is edited here; a built condition (prompt = value …) only shown
+                        string typed = UserInput(iff?.Element("test"));
+                        Flow.Add($";  {pad}{num}  IF ({(typed ?? Condition(iff?.Element("test"))).Trim()}){off}");
+                        if (typed != null)
+                            AddSection($"{num} IF", new List<KeyValuePair<string, string>> { Kv("Test", typed.Trim()) }, "if", here);
                         foreach (string branch in new[] { "then", "else" })
                         {
                             XElement br = iff?.Element(branch);
@@ -237,21 +351,127 @@ namespace CalcStudioEPM.Epm
                     }
                     else if (type == "template")
                     {
-                        Flow.Add($";  {pad}{num}  Template «{(string)st.Element("template_ref")?.Attribute("name")}»  (edited in Calculation Manager)");
+                        XElement tr = st.Element("template_ref");
+                        string tName = (string)tr?.Attribute("name") ?? "";
+                        Flow.Add($";  {pad}{num}  Template «{tName}»{off}");
+                        AddTemplatePrompts(num, tName, tr, here);
+                    }
+                    else if (type == "rule")
+                    {
+                        Flow.Add($";  {pad}{num}  Rule «{RealRuleName((string)st.Attribute("name"))}»  (runs that rule){off}");
                     }
                     else
                     {
-                        Flow.Add($";  {pad}{num}  {kind ?? type} (edited in Calculation Manager)");
+                        Flow.Add($";  {pad}{num}  {kind ?? type} (edited in Calculation Manager){off}");
                     }
                 }
             }
 
-            private void AddSection(string title, List<KeyValuePair<string, string>> values, string kind, string path)
+            /// <summary>A rule step names its rule in capitals; the file embeds that rule with its real name.</summary>
+            private string RealRuleName(string name) =>
+                Doc?.Root?.Element("rules")?.Elements("rule").Select(r => (string)r.Attribute("name"))
+                   .FirstOrDefault(r => string.Equals(r, name, StringComparison.OrdinalIgnoreCase)) ?? name;
+
+            /// <summary>
+            /// A template step's values for the template's design-time prompts: one section with
+            /// the simple ones (grouped by type), one per member-range / cross-dimension prompt
+            /// (Dimension = members, like a FIX). The system restrictions (Application Type,
+            /// Application, Essbase Mode) are shown, not edited.
+            /// </summary>
+            private void AddTemplatePrompts(string num, string tName, XElement tr, string here)
             {
-                Sections.Add((title, values));
-                Manifest.Sections[title] = new SectionEntry { Kind = kind, Path = path };
+                var prompts = tr?.Element("template_prompts")?.Elements().ToList() ?? new List<XElement>();
+                XElement defs = TemplateElement(Doc, tName)?.Element("template_prompts");
+                XElement Def(XElement p) => defs?.Elements().FirstOrDefault(d => (string)d.Attribute("name") == (string)p.Attribute("name"));
+
+                var system = prompts.Where(IsSystemPrompt).Select(p => $"{(string)p.Attribute("name")} = {p.Element("value")?.Value}").ToList();
+                var simple = EditablePrompts(tr, IsSimplePrompt);
+                var repeated = RepeatedPrompts(tr);
+                if (simple.Count > 0 || system.Count > 0)
+                {
+                    var notes = new List<string>();
+                    if (system.Count > 0) notes.Add("; Template for: " + string.Join(" · ", system));
+                    if (repeated.Count > 0)
+                        notes.Add($"; Listed more than once in this step, so changed in Calculation Manager: {string.Join(", ", repeated)}");
+                    var values = new List<KeyValuePair<string, string>>();
+                    // Grouped by description, in the order the template lists them
+                    foreach (var g in simple.GroupBy(p => PromptDescription(p, Def(p))))
+                    {
+                        values.Add(Kv("; " + g.Key, ""));
+                        values.AddRange(g.Select(p => Kv((string)p.Attribute("name"), OneLine(p.Element("value")?.Value ?? ""))));
+                    }
+                    AddSection($"{num} Template {tName}", values, "template", here, notes);
+                }
+                foreach (XElement p in EditablePrompts(tr, x => x.Name == "template_slice_prompt"))
+                {
+                    string pName = (string)p.Attribute("name");
+                    AddSection($"{num} Template {tName} · {pName}", SliceOf(p), "templateslice", here,
+                               new List<string> { $"; {PromptDescription(p, Def(p))} — Dimension = members, one line per dimension" },
+                               pName);
+                }
+            }
+
+            private void AddSection(string title, List<KeyValuePair<string, string>> values, string kind, string path,
+                                    List<string> notes = null, string prompt = null)
+            {
+                Sections.Add((title, notes ?? new List<string>(), values));
+                Manifest.Sections[title] = new SectionEntry { Kind = kind, Path = path, Prompt = prompt };
             }
         }
+
+        /// <summary>Application Type, Application, Essbase Mode: set by the template, not the rule.</summary>
+        private static bool IsSystemPrompt(XElement p) =>
+            p.Name == "restricted_prompt" && (string)p.Attribute("type") != "Restricted List";
+
+        /// <summary>A one-value prompt the .ini edits (not a member range, separator or system one).</summary>
+        private static bool IsSimplePrompt(XElement p) =>
+            (p.Name == "template_prompt" || p.Name == "restricted_prompt") && !IsSystemPrompt(p) &&
+            (string)p.Attribute("type") != "Separator" && p.Elements("value").Count() <= 1 &&
+            !(p.Element("value")?.Value ?? "").Contains("\n");
+
+        /// <summary>
+        /// A template step's prompts the .ini can edit, by kind: names that appear more than once in
+        /// the step (it happens in EPM's own templates) can't be told apart, so they are left out.
+        /// </summary>
+        private static List<XElement> EditablePrompts(XElement templateRef, Func<XElement, bool> kind)
+        {
+            var all = templateRef?.Element("template_prompts")?.Elements().ToList() ?? new List<XElement>();
+            var repeated = new HashSet<string>(all.GroupBy(p => (string)p.Attribute("name") ?? "", StringComparer.OrdinalIgnoreCase)
+                                                  .Where(g => g.Count() > 1).Select(g => g.Key), StringComparer.OrdinalIgnoreCase);
+            return all.Where(p => kind(p) && !repeated.Contains((string)p.Attribute("name") ?? "")).ToList();
+        }
+
+        /// <summary>Prompt names that appear more than once in a template step.</summary>
+        private static List<string> RepeatedPrompts(XElement templateRef) =>
+            (templateRef?.Element("template_prompts")?.Elements() ?? Enumerable.Empty<XElement>())
+                .GroupBy(p => (string)p.Attribute("name") ?? "", StringComparer.OrdinalIgnoreCase)
+                .Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+
+        /// <summary>A built condition as text: "Add Requisition DTP1 = True", "(A = 1) AND (B &lt;&gt; 2)".</summary>
+        private static string Condition(XElement holder)
+        {
+            string Render(XElement e)
+            {
+                if (e == null) return "";
+                if (e.Name == "user_inp") return OneLine(e.Value).Trim();
+                if (e.Name == "biop")
+                {
+                    var parts = e.Elements("expression").OrderBy(x => (int?)x.Attribute("seq") ?? 0).Select(Render).ToList();
+                    string op = Operators.TryGetValue((string)e.Attribute("type") ?? "", out string o) ? o : (string)e.Attribute("type");
+                    bool nested = e.Elements("expression").Any(x => x.Element("biop") != null);
+                    return string.Join($" {op} ", parts.Select(s => nested && s.Contains(" ") ? $"({s})" : s));
+                }
+                XElement child = e.Elements().FirstOrDefault();
+                return child != null ? Render(child) : OneLine(e.Value).Trim();
+            }
+            string text = Render(holder?.Element("expression") ?? holder);
+            return text.Length > 0 ? text : "…";
+        }
+
+        private static readonly Dictionary<string, string> Operators = new Dictionary<string, string>
+        {
+            ["eq"] = "=", ["ne"] = "<>", ["gt"] = ">", ["lt"] = "<", ["ge"] = ">=", ["le"] = "<=", ["and"] = "AND", ["or"] = "OR",
+        };
 
         // ------------------------------------------------------------------ //
         //  Deploy: folder → XML
@@ -284,6 +504,9 @@ namespace CalcStudioEPM.Epm
             Manifest manifest;
             try { manifest = JsonConvert.DeserializeObject<Manifest>(File.ReadAllText(Path.Combine(folder, ManifestName), Encoding.UTF8)); }
             catch (Exception ex) { throw new EpmException($"Could not read {ManifestName} in {folder}: {ex.Message}. Pull again."); }
+            if (manifest.Template)
+                throw new EpmException($"'{manifest.Rule}' is a template: templates are changed in Calculation Manager. " +
+                                       "Its values are set in the 00 - Rule.ini of the rules that use it.");
 
             var result = new Applied { Doc = doc, TextBefore = AllText(rule) };
             var problems = new List<string>();
@@ -400,8 +623,44 @@ namespace CalcStudioEPM.Epm
                     ui.Value = test.Trim();
                     return true;
                 }
+                case "template":
+                    return ApplyTemplatePrompts(st.Element("template_ref"), values);
+                case "templateslice":
+                {
+                    XElement prompt = EditablePrompts(st.Element("template_ref"), x => x.Name == "template_slice_prompt")
+                                        .FirstOrDefault(p => (string)p.Attribute("name") == sec.Prompt)
+                                      ?? throw new FormatException($"the template step no longer has the prompt '{sec.Prompt}' — pull again.");
+                    return ApplySlice(prompt, values);
+                }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Sets a template step's simple prompt values ("Prompt = value"; empty = no value).
+        /// Prompts left out keep their value. False when nothing changed.
+        /// </summary>
+        private static bool ApplyTemplatePrompts(XElement templateRef, List<KeyValuePair<string, string>> values)
+        {
+            var prompts = EditablePrompts(templateRef, IsSimplePrompt)
+                .ToDictionary(p => (string)p.Attribute("name"), StringComparer.OrdinalIgnoreCase);
+            var dupes = values.GroupBy(v => v.Key, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            if (dupes.Count > 0) throw new FormatException($"{string.Join(", ", dupes)} appears more than once.");
+
+            bool changed = false;
+            foreach (var v in values)
+            {
+                if (!prompts.TryGetValue(v.Key, out XElement p))
+                    throw new FormatException($"'{v.Key}' is not a prompt of this template step (expected {string.Join(", ", prompts.Keys)}).");
+                string now = v.Value.Trim();
+                XElement value = p.Element("value");
+                if ((value?.Value ?? "").Trim() == now) continue;
+                if (now.Length == 0) value.Remove();
+                else if (value != null) value.Value = now;
+                else p.Add(new XElement("value", now));
+                changed = true;
+            }
+            return changed;
         }
 
         /// <summary>
@@ -442,8 +701,12 @@ namespace CalcStudioEPM.Epm
                 else { d.Element("expression")?.Remove(); d.Add(new XElement("expression", new XElement("user_inp", members))); }
                 rebuilt.Add(d);
             }
-            int seq = 1;
-            foreach (XElement d in rebuilt) d.SetAttributeValue("seq", seq++);
+            // FIX slices number their dimensions; a template's member-range prompt doesn't
+            if (slice.Elements("dimension").Any(d => d.Attribute("seq") != null) || slice.Name != "template_slice_prompt")
+            {
+                int seq = 1;
+                foreach (XElement d in rebuilt) d.SetAttributeValue("seq", seq++);
+            }
             slice.Elements("dimension").Remove();
             slice.Add(rebuilt);
             return true;
@@ -469,7 +732,8 @@ namespace CalcStudioEPM.Epm
             return statement;
         }
 
-        private static Dictionary<string, List<KeyValuePair<string, string>>> ParseIni(string text)
+        /// <summary>[Section] → its "Key = value" lines, in order (also used by <see cref="RuleSet"/>).</summary>
+        internal static Dictionary<string, List<KeyValuePair<string, string>>> ParseIni(string text)
         {
             var result = new Dictionary<string, List<KeyValuePair<string, string>>>(StringComparer.OrdinalIgnoreCase);
             List<KeyValuePair<string, string>> current = null;
@@ -808,9 +1072,11 @@ namespace CalcStudioEPM.Epm
 
         private static string UserInput(XElement holder) => holder?.Element("expression")?.Element("user_inp")?.Value;
 
-        /// <summary>The dimension holder: a loop's &lt;source&gt;&lt;slice&gt;, or &lt;globalrange&gt; itself.</summary>
+        /// <summary>The dimension holder: a loop's &lt;source&gt;&lt;slice&gt;, or &lt;globalrange&gt; or a
+        /// template's member-range prompt itself.</summary>
         private static XElement DimensionsOf(XElement holder) =>
-            holder?.Element("slice") ?? (holder?.Name == "globalrange" ? holder : null);
+            holder?.Element("slice") ??
+            (holder?.Name == "globalrange" || holder?.Name == "template_slice_prompt" ? holder : null);
 
         private static List<KeyValuePair<string, string>> SliceOf(XElement holder) =>
             (DimensionsOf(holder)?.Elements("dimension") ?? Enumerable.Empty<XElement>())
@@ -818,9 +1084,11 @@ namespace CalcStudioEPM.Epm
 
         private static KeyValuePair<string, string> Kv(string k, string v) => new KeyValuePair<string, string>(k, v);
 
+        // Template prompt values count too: one can hold a runtime prompt ("{Years}")
         private static string AllText(XElement rule) =>
             string.Join("\n", rule.Descendants("script").Select(s => s.Value)
-                                  .Concat(rule.Descendants("user_inp").Select(u => u.Value)));
+                                  .Concat(rule.Descendants("user_inp").Select(u => u.Value))
+                                  .Concat(rule.Descendants("template_prompts").Descendants("value").Select(v => v.Value)));
 
         private static string Canon(XElement e)
         {

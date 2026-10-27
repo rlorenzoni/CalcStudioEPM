@@ -24,10 +24,12 @@ namespace CalcStudioEPM.Epm
         {
             if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return 0;
             int changed = 0;
+            Func<string, bool> alwaysReadOnly = GraphicalRule.AlwaysReadOnly();   // templates, formula steps the format can't hold
             foreach (string file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
             {
                 try
                 {
+                    if (!readOnly && alwaysReadOnly(file)) continue;
                     FileAttributes a = File.GetAttributes(file);
                     FileAttributes b = readOnly ? a | FileAttributes.ReadOnly : a & ~FileAttributes.ReadOnly;
                     if (a == b) continue;

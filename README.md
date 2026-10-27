@@ -201,17 +201,45 @@ A rule built in Calculation Manager's designer (a flow of steps, not one script)
 
 | File | What it holds |
 |---|---|
-| `00 - Rule.ini` | The flow, as comments, then the editable values: `[Global range]` and `[NN FIX]` (the designer's member-range loops) list every dimension of the rule's cube, one `Dimension = members` line each, empty when not fixed (all of them once dimensions were downloaded; otherwise those the rule uses); `[NN Member block]` (`Member = …`); `[NN IF]` (`Test = …`) |
+| `00 - Rule.ini` | The flow, as comments, then the editable values: `[Global range]` and `[NN FIX]` (the designer's member-range loops) list every dimension of the rule's cube, one `Dimension = members` line each, empty when not fixed (all of them once dimensions were downloaded; otherwise those the rule uses); `[NN Member block]` (`Member = …`); `[NN IF]` (`Test = …`, for an IF typed as text; one built in the designer, such as `Application = Is Multi Currency`, is shown in the flow); `[NN Template X]`: the values a template step passes to the template's design-time prompts, grouped by type, with a restricted list's allowed values and "asked at run time" noted, and the template's fixed settings (Application Type, Application, Essbase Mode) shown; `[NN Template X · Prompt]`: a member-range or cross-dimension prompt, one `Dimension = members` line each, like a FIX. The flow also names the rules a rule runs, marks disabled steps, and shows the condition of a step that only runs `when` a prompt has a value. |
 | `NN - {caption}.csc` | A script step, exactly as Calculation Manager holds it |
 | `NN - {caption}.formula.csc` | A formula step: one `"Destination" = expression;` per row, or `"Member";` for a member formula. A `/* comment */` just above a row (or an IF) is its comment, with `*\/` standing for `*/` inside it; `/*# … */` lines carry the step's caption, description and block labels. A formula step with settings this format can't hold is written read-only (with a note) and is edited in Calculation Manager |
 | `.flow.json` | Which file is which step (component id) — bookkeeping, don't edit |
 
-The order and kind of steps, and template steps, are changed in Calculation Manager only.
+The order and kind of steps are changed in Calculation Manager only. A template step's prompt values are changed in `00 - Rule.ini`; the template itself in Calculation Manager.
+
+**Graphical templates** are pulled the same way, as a read-only folder `…\Templates\{Template}\`: every step file, and `00 - Template.ini` with the template's design-time prompts (type, allowed values, defaults) and its flow. They show what a template does; Deploy refuses them, since templates are changed in Calculation Manager. (Before, such a template was pulled as a `.csc` holding only its first script step.) Script templates are still pulled as `.csc`.
 
 **Deploy** from any of these files writes them back into the rule by component id and step, leaving everything else untouched. It validates every step file, lists what changed and asks before deploying. Graphical rules go to **Calculation Manager only**: deploy the rule to Planning from Calculation Manager afterwards. Only saved files are deployed. **Execute** warns when the folder has changes that aren't deployed. Step files are validated as fragments, like templates, since a step can sit inside a loop or member block. Member autocomplete and the Dimension Navigator work in them as in any `.csc`. In `00 - Rule.ini`, autocomplete works on the value after `=`:
 - **FIX and global range lines:** only that dimension's members, shown as `Member - Alias` and matched by name or alias. A bare word (`Scenario = Fore`) also opens the list, and the pick is inserted quoted (`"Forecast"`).
 - **Inside a function:** `@` lists the functions with their parameter hints; quoted names inside a function (`@RELATIVE("Over…`) list that dimension's members.
 - **`Member =` and `Test =`:** list members of every dimension of the rule's cube.
+
+### RuleSets
+
+A RuleSet only runs existing rules (and other RuleSets) in order, so it isn't code to maintain. EPM's export of a RuleSet still embeds a full copy of every rule, template and runtime prompt it uses, and those copies go out of date as soon as one of the rules changes. So Pull writes just the RuleSet's definition, as `…\Planning\{app}\RuleSets\{RuleSet}.ruleset.ini`:
+
+```ini
+; Runs, in this order (in parallel):
+;    1  Rule     OPF_Calculate Labor Expense Rule  · OEP_PFP
+;    …
+
+[RuleSet]
+Description     =
+Merge variables = true
+Run in parallel = true
+
+[Currency]
+; Scope: Cube OEP_PFP · from rule OPF_Calculate Labor Expense Rule
+Hidden                = true
+Value                 =
+Use as override value = false
+Validation value      = "No Currency"
+```
+
+- **What you edit:** the settings in `[RuleSet]`, and one section per runtime prompt (Calculation Manager's *Variables* tab). Other properties Calculation Manager stores on a prompt or the RuleSet appear under their own names and can be edited too. Which rules run, and their order, change in Calculation Manager.
+- **Deploy** (from the `.ini`) puts the RuleSet together at deploy time: its definition with your `.ini` applied, the definitions of the RuleSets it runs (with their own `.ini`), and the **deployed version** of every rule it runs and every rule those call (`%Rule`). The ids that link them are renumbered. It lists what changed, warns about member rules with saved changes that aren't deployed (the RuleSet uses their deployed version), checks whether someone changed the RuleSet in EPM since your pull, and deploys to **Calculation Manager only**: deploy it to Planning from Calculation Manager afterwards.
+- **Checked against real exports:** for 57 RuleSets of six applications, the `.ini` reproduces each definition exactly, and the RuleSet put together from the pulled rules matches EPM's own export. The only differences are inside EPM's stored copy: a `plantype` property it leaves out on rule-scoped prompts, and copies of rules that no step runs any more.
 
 From the start, the substitution / user variables (and, when asked, dimensions and members) download in parallel. The progress window shows each step as it runs; the parallel row shows its own live status (e.g. `dimensions 40 of 96`) and keeps updating even if the pull itself fails. Show details opens the full log.
 

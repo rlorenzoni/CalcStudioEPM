@@ -20,9 +20,11 @@ namespace CalcStudioEPM.Forms
         {
             "Build the deployment package",                   // DeployStep.BuildPackage
             "Upload the package to EPM Cloud",                // DeployStep.Upload
-            plan.IncludesPlanning                             // DeployStep.Import
-                ? "Import the rule into Calculation Manager and Planning"
-                : "Import the rule into Calculation Manager",
+            plan.IsRuleSet                                    // DeployStep.Import
+                ? "Import the RuleSet into Calculation Manager"
+                : plan.IncludesPlanning
+                    ? "Import the rule into Calculation Manager and Planning"
+                    : "Import the rule into Calculation Manager",
             "Remove the temporary snapshot from EPM Cloud",   // DeployStep.CleanUp
         };
 
@@ -62,10 +64,16 @@ namespace CalcStudioEPM.Forms
                 : "ACTION NEEDED: Planning still runs the previous version of '" + ruleName + "'. " +
                   "Deploy it to Planning from Calculation Manager, or with 'Deploy CM+HP'.";
 
+        /// <summary>A RuleSet put together by <see cref="RuleSet.Assemble"/> (plan from <see cref="DeployPlan.ForRuleSet"/>).</summary>
+        public static DeployProgressForm ForRuleSet(ConnectionConfig cfg, string application, string ruleSetName, DeployPlan plan) =>
+            new DeployProgressForm(cfg, application, null, ruleSetName, plan);
+
         protected override Task<DeployResult> RunAsync(System.IProgress<string> log) =>
-            DeployService.DeployRuleAsync(
-                _cfg, _planType, _cube, _ruleName, _plan,
-                log, StepProgress<DeployStep>(s => (int)s));
+            _plan.IsRuleSet
+                ? DeployService.DeployRuleSetAsync(_cfg, _planType, _ruleName, _plan, log, StepProgress<DeployStep>(s => (int)s))
+                : DeployService.DeployRuleAsync(
+                    _cfg, _planType, _cube, _ruleName, _plan,
+                    log, StepProgress<DeployStep>(s => (int)s));
 
         protected override void OnSucceeded(DeployResult r)
         {
@@ -83,8 +91,9 @@ namespace CalcStudioEPM.Forms
             string templates = _plan.InlinedTemplates.Count == 0 ? "" :
                 $"\nPlanning copy built with {_plan.InlinedTemplates.Count} template(s) inlined.";
             SetSummary(
-                $"'{_ruleName}' ({_planType} / {_cube}) is now deployed to {ConnLabel(_cfg)}: " +
+                $"'{_ruleName}' ({_planType}{(_cube != null ? " / " + _cube : " RuleSet")}) is now deployed to {ConnLabel(_cfg)}: " +
                 $"{_plan.TargetsText}." + templates +
+                (_plan.IsRuleSet ? "\nDeploy it to Planning from Calculation Manager when you want Planning to run this version." : "") +
                 (r.ImportDetails != null ? $"\nEPM Cloud reported: {r.ImportDetails}" : ""));
 
             // CM-only by choice: a reminder. CM+HP asked for but blocked: the red alert.

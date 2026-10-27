@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using CalcStudioEPM.Config;
 
@@ -105,95 +107,9 @@ namespace CalcStudioEPM.Epm
 
                 progress?.Report($"Package built ({zipBytes.Length / 1024} KB). Proceeding with upload…");
 
-                // ---------------------------------------------------------- //
-                //  Step 2: Upload ZIP (4-step EPM v2 protocol)
-                // ---------------------------------------------------------- //
-                steps?.Report(DeployStep.Upload);
-                try
-                {
-                    await client.UploadSnapshotAsync(snapshotName, zipBytes, progress)
-                        .ConfigureAwait(false);
-                }
-                catch (EpmException ex)
-                {
-                    throw new EpmException($"Upload failed: {ex.Message}", ex);
-                }
-
-                progress?.Report("Upload complete.");
-
-                // ---------------------------------------------------------- //
-                //  Step 3: Start import job
-                // ---------------------------------------------------------- //
-                steps?.Report(DeployStep.Import);
-                progress?.Report("Starting migration import job…");
-
-                MigrationExportResponse importResp;
-                try
-                {
-                    importResp = await client
-                        .ImportSnapshotAsync(snapshotName)
-                        .ConfigureAwait(false);
-                }
-                catch (EpmException ex)
-                {
-                    throw new EpmException($"Failed to start import: {ex.Message}", ex);
-                }
-
-                if (importResp == null)
-                    throw new EpmException("EPM Cloud returned an empty response to the import request.");
-
-                // HTTP 200 can still carry a business error (status > 0) — surface EPM's text
-                if (importResp.Status > 0)
-                    throw new EpmException(
-                        $"EPM rejected the import (status {importResp.Status}): " +
-                        (importResp.Details ?? "(no details)"));
-
-                // A status of 0 means the import completed synchronously (unlikely but handle it)
-                if (importResp.Status == 0)
-                {
-                    progress?.Report(
-                        $"Rule '{ruleName}' deployed successfully to EPM Cloud (synchronous).");
-                }
-                else
-                {
-                    string statusUrl = importResp.JobStatusUrl;
-                    if (string.IsNullOrWhiteSpace(statusUrl))
-                        throw new EpmException(
-                            "Import response did not include a 'Job Status' link. " +
-                            "Cannot poll for completion.");
-
-                    string jobId = statusUrl.TrimEnd('/');
-                    int slash = jobId.LastIndexOf('/');
-                    if (slash >= 0) jobId = jobId.Substring(slash + 1);
-                    result.JobId = jobId;
-
-                    progress?.Report($"Import job accepted (ID: {jobId}). Waiting for completion…");
-
-                    // ------------------------------------------------------ //
-                    //  Step 4: Poll until import job finishes
-                    // ------------------------------------------------------ //
-                    InteropJobStatusResponse finalStatus;
-                    try
-                    {
-                        finalStatus = await client
-                            .PollInteropJobByUrlAsync(statusUrl, ImportJobTimeout)
-                            .ConfigureAwait(false);
-                    }
-                    catch (EpmException ex)
-                    {
-                        throw new EpmException(
-                            $"Import job {jobId} failed: {ex.Message}", ex);
-                    }
-
-                    string detail = finalStatus?.Details;
-                    result.ImportDetails = string.IsNullOrWhiteSpace(detail) ? null : detail;
-                    if (result.ImportDetails == null)
-                        progress?.Report(
-                            $"Rule '{ruleName}' deployed successfully to EPM Cloud (job {jobId}).");
-                    else
-                        progress?.Report(
-                            $"Rule '{ruleName}' deployed (job {jobId}): {detail}");
-                }
+                // Steps 2–4: upload, import, wait for the import
+                await UploadAndImportAsync(client, snapshotName, zipBytes, $"Rule '{ruleName}'", result, progress, steps)
+                    .ConfigureAwait(false);
 
                 // The import succeeded: what we uploaded is now the deployed version.
                 // Record it locally so Execute knows which script and prompts EPM holds.
@@ -221,6 +137,159 @@ namespace CalcStudioEPM.Epm
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Deploys a RuleSet put together by <see cref="RuleSet.Assemble"/> to Calculation
+        /// Manager: package, upload, import, then the uploaded XML becomes the pulled RuleSet
+        /// (the base of its next deploy) and the temporary snapshot is removed.
+        /// </summary>
+        public static async Task<DeployResult> DeployRuleSetAsync(
+            ConnectionConfig cfg,
+            string application,
+            string ruleSetName,
+            DeployPlan plan,
+            IProgress<string> progress,
+            IProgress<DeployStep> steps = null)
+        {
+            if (cfg == null)  throw new ArgumentNullException(nameof(cfg));
+            if (plan?.RuleXml == null) throw new ArgumentNullException(nameof(plan));
+
+            var result = new DeployResult { Plan = plan };
+            string snapshotName = BuildSnapshotName(cfg.Username);
+            progress?.Report($"Snapshot name: {snapshotName}.zip");
+
+            using (var client = new EpmClient(cfg))
+            {
+                steps?.Report(DeployStep.BuildPackage);
+                progress?.Report($"Building the deployment package for RuleSet '{ruleSetName}' (Calculation Manager only)…");
+                byte[] zipBytes;
+                try
+                {
+                    zipBytes = PackageBuilder.BuildRuleSet(application, ruleSetName, plan.RuleXml, cfg.Username, cfg.LocalFolderPath);
+                }
+                catch (Exception ex)
+                {
+                    throw new EpmException("Failed to build deployment package: " + ex.Message, ex);
+                }
+                progress?.Report($"Package built ({zipBytes.Length / 1024} KB). Proceeding with upload…");
+
+                await UploadAndImportAsync(client, snapshotName, zipBytes, $"RuleSet '{ruleSetName}'", result, progress, steps)
+                    .ConfigureAwait(false);
+
+                try
+                {
+                    string pulled = RuleSet.PulledPath(cfg.LocalFolderPath, application, ruleSetName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(pulled));
+                    File.WriteAllText(pulled, plan.RuleXml, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                }
+                catch (Exception ex)
+                {
+                    progress?.Report($"  [WARN] Could not record the deployed version locally: {ex.Message}");
+                }
+
+                await RuleChangeCheck.RecordOwnDeployAsync(client, cfg, application, RuleSet.FolderName, ruleSetName, progress).ConfigureAwait(false);
+
+                steps?.Report(DeployStep.CleanUp);
+                result.CleanupError = await CleanUpSnapshotAsync(client, snapshotName, progress)
+                    .ConfigureAwait(false);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Uploads the package as a snapshot (4-step EPM v2 protocol), starts the LCM import and
+        /// waits for it. Throws <see cref="EpmException"/> when any of it fails.
+        /// </summary>
+        private static async Task UploadAndImportAsync(
+            EpmClient client, string snapshotName, byte[] zipBytes, string what,
+            DeployResult result, IProgress<string> progress, IProgress<DeployStep> steps)
+        {
+            // ---------------------------------------------------------- //
+            //  Step 2: Upload ZIP (4-step EPM v2 protocol)
+            // ---------------------------------------------------------- //
+            steps?.Report(DeployStep.Upload);
+            try
+            {
+                await client.UploadSnapshotAsync(snapshotName, zipBytes, progress)
+                    .ConfigureAwait(false);
+            }
+            catch (EpmException ex)
+            {
+                throw new EpmException($"Upload failed: {ex.Message}", ex);
+            }
+
+            progress?.Report("Upload complete.");
+
+            // ---------------------------------------------------------- //
+            //  Step 3: Start import job
+            // ---------------------------------------------------------- //
+            steps?.Report(DeployStep.Import);
+            progress?.Report("Starting migration import job…");
+
+            MigrationExportResponse importResp;
+            try
+            {
+                importResp = await client
+                    .ImportSnapshotAsync(snapshotName)
+                    .ConfigureAwait(false);
+            }
+            catch (EpmException ex)
+            {
+                throw new EpmException($"Failed to start import: {ex.Message}", ex);
+            }
+
+            if (importResp == null)
+                throw new EpmException("EPM Cloud returned an empty response to the import request.");
+
+            // HTTP 200 can still carry a business error (status > 0) — surface EPM's text
+            if (importResp.Status > 0)
+                throw new EpmException(
+                    $"EPM rejected the import (status {importResp.Status}): " +
+                    (importResp.Details ?? "(no details)"));
+
+            // A status of 0 means the import completed synchronously (unlikely but handle it)
+            if (importResp.Status == 0)
+            {
+                progress?.Report($"{what} deployed successfully to EPM Cloud (synchronous).");
+                return;
+            }
+
+            string statusUrl = importResp.JobStatusUrl;
+            if (string.IsNullOrWhiteSpace(statusUrl))
+                throw new EpmException(
+                    "Import response did not include a 'Job Status' link. " +
+                    "Cannot poll for completion.");
+
+            string jobId = statusUrl.TrimEnd('/');
+            int slash = jobId.LastIndexOf('/');
+            if (slash >= 0) jobId = jobId.Substring(slash + 1);
+            result.JobId = jobId;
+
+            progress?.Report($"Import job accepted (ID: {jobId}). Waiting for completion…");
+
+            // ------------------------------------------------------ //
+            //  Step 4: Poll until import job finishes
+            // ------------------------------------------------------ //
+            InteropJobStatusResponse finalStatus;
+            try
+            {
+                finalStatus = await client
+                    .PollInteropJobByUrlAsync(statusUrl, ImportJobTimeout)
+                    .ConfigureAwait(false);
+            }
+            catch (EpmException ex)
+            {
+                throw new EpmException(
+                    $"Import job {jobId} failed: {ex.Message}", ex);
+            }
+
+            string detail = finalStatus?.Details;
+            result.ImportDetails = string.IsNullOrWhiteSpace(detail) ? null : detail;
+            if (result.ImportDetails == null)
+                progress?.Report($"{what} deployed successfully to EPM Cloud (job {jobId}).");
+            else
+                progress?.Report($"{what} deployed (job {jobId}): {detail}");
         }
 
         /// <summary>

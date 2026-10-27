@@ -147,11 +147,38 @@ namespace CalcStudioEPM.Epm
                 string outDir  = Path.Combine(scriptsDir, relPath);
                 Directory.CreateDirectory(outDir);
 
-                // A graphical rule (designer flow of steps) becomes a folder of step files
+                // A RuleSet only runs other rules: its definition becomes an .ini (see RuleSet).
+                // Its XML embeds copies of those rules, so it is never read as a script.
+                if (string.Equals(type, "RuleSet", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        string ini = RuleSet.ToIni(XDocument.Load(sourceFile), name);
+                        File.WriteAllText(Path.Combine(outDir, PathConstants.ToFileName(name) + RuleSet.IniSuffix), ini,
+                            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                        copied++;
+                    }
+                    catch (Exception ex)
+                    {
+                        progress?.Report($"  [WARN] Could not write RuleSet '{name}': {ex.Message}");
+                        skipped++;
+                    }
+                    continue;
+                }
+
+                // A graphical rule (designer flow of steps) becomes a folder of step files; so does a
+                // graphical template, read only (its file holds no single script to show)
                 XDocument graphical = null;
-                try { var d = XDocument.Load(sourceFile); if (GraphicalRule.IsGraphical(d)) graphical = d; } catch { }
+                bool isTemplate = string.Equals(type, "Template", StringComparison.OrdinalIgnoreCase);
+                try
+                {
+                    var d = XDocument.Load(sourceFile);
+                    if (isTemplate ? GraphicalRule.IsGraphicalTemplate(d, name) : GraphicalRule.IsGraphical(d)) graphical = d;
+                }
+                catch { }
                 if (graphical != null)
                 {
+                    string what = isTemplate ? "graphical template" : "graphical rule";
                     try
                     {
                         string ruleDir = Path.Combine(outDir, PathConstants.ToFileName(name));
@@ -159,13 +186,15 @@ namespace CalcStudioEPM.Epm
                         string[] pathParts = artifactPath.Trim('/').Split('/');     // Planning/{app}/{cube}/Rules
                         System.Collections.Generic.List<string> cubeDims = null;
                         if (metadata.HasDimensions && pathParts.Length >= 3) metadata.Dims.Cubes.TryGetValue(pathParts[2], out cubeDims);
-                        int files = GraphicalRule.Extract(graphical, name, ruleDir, progress, cubeDims);
-                        progress?.Report($"  Graphical rule '{name}': {files} files in {ruleDir}");
+                        int files = isTemplate
+                            ? GraphicalRule.ExtractTemplate(graphical, name, ruleDir, progress, cubeDims)
+                            : GraphicalRule.Extract(graphical, name, ruleDir, progress, cubeDims);
+                        progress?.Report($"  {(isTemplate ? "Graphical template" : "Graphical rule")} '{name}': {files} files in {ruleDir}");
                         copied++;
                     }
                     catch (Exception ex)
                     {
-                        progress?.Report($"  [WARN] Could not write graphical rule '{name}': {ex.Message}");
+                        progress?.Report($"  [WARN] Could not write {what} '{name}': {ex.Message}");
                         skipped++;
                     }
                     continue;

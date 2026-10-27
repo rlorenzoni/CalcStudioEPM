@@ -977,7 +977,21 @@ namespace CalcStudioEPM
                 return;
             }
 
-            string graphicalDir = GraphicalRule.RuleFolderOf(GetActiveFilePath(silent: true));
+            string activePath = GetActiveFilePath(silent: true);
+            if (RuleSet.IsRuleSetIni(activePath))
+            {
+                DeployRuleSet(cfg, title, activePath);
+                return;
+            }
+
+            string graphicalDir = GraphicalRule.RuleFolderOf(activePath);
+            if (graphicalDir != null && GraphicalRule.IsTemplateFolder(graphicalDir))
+            {
+                ShowInfo(title,
+                    "This is a graphical template, pulled read only: templates are changed in Calculation Manager.\n\n" +
+                    "The values a rule passes to the template's prompts are set in that rule's 00 - Rule.ini.");
+                return;
+            }
             if (graphicalDir != null)
             {
                 DeployGraphicalRule(cfg, title, graphicalDir);
@@ -1058,6 +1072,54 @@ namespace CalcStudioEPM
             if (!PasswordForm.Ensure(NppOwner, cfg)) return;
             if (!ConfirmNotChangedInEpm(cfg, title, rule)) return;
             using (var dlg = new Forms.DeployProgressForm(cfg, rule.PlanType, rule.Cube, rule.RuleName, plan))
+                dlg.ShowDialog();
+        }
+
+        /// <summary>
+        /// Deploys a RuleSet from its .ruleset.ini: puts it together from the pulled definition,
+        /// the .ini files and the deployed version of every rule it runs (see <see cref="RuleSet"/>),
+        /// shows what changed, and deploys to Calculation Manager only.
+        /// </summary>
+        private static void DeployRuleSet(ConnectionConfig cfg, string title, string iniPath)
+        {
+            if (!EnsureActiveTabSaved(title)) return;
+
+            string app, name;
+            try { (app, name) = RuleSet.ParseIniPath(iniPath); }
+            catch (EpmException ex) { ShowError(title, ex.Message); return; }
+            if (!string.Equals(app, cfg.Application, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowError(title, $"'{name}' belongs to application {app}, but the connection '{DisplayName(cfg)}' is for {cfg.Application}.");
+                return;
+            }
+
+            RuleSet.Assembled assembled;
+            try { assembled = RuleSet.Assemble(cfg.LocalFolderPath, app, name, Path.GetDirectoryName(iniPath)); }
+            catch (EpmException ex) { ShowError(title, ex.Message); return; }
+
+            string List(IEnumerable<string> items, int max = 12)
+            {
+                var all = items.ToList();
+                return "  • " + string.Join("\n  • ", all.Take(max)) + (all.Count > max ? $"\n  … and {all.Count - max} more" : "");
+            }
+            string changes = assembled.Changes.Count == 0
+                ? "No settings or runtime prompts changed since the last pull or deploy."
+                : "Changed:\n" + List(assembled.Changes);
+            string notes = assembled.Notes.Count == 0 ? "" : "\n\nNote:\n" + List(assembled.Notes);
+            string sets = assembled.RuleSets.Count > 1 ? $" and {assembled.RuleSets.Count - 1} RuleSet(s) it runs" : "";
+            if (MessageBox.Show(NppOwner,
+                    $"Deploy the RuleSet '{name}' to Calculation Manager?\n\n{changes}{notes}\n\n" +
+                    $"It is put together from the deployed version of its {assembled.Rules.Count} rule(s){sets}. " +
+                    "RuleSets are deployed to Calculation Manager only: deploy it to Planning from Calculation Manager " +
+                    "afterwards. Only saved files are deployed.",
+                    title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            PluginLog($"Deploy plan for RuleSet '{name}': {assembled.Rules.Count} rule(s): {string.Join(" | ", assembled.Rules)}; " +
+                      $"changes: {string.Join(" | ", assembled.Changes)}; notes: {string.Join(" | ", assembled.Notes)}");
+            if (!PasswordForm.Ensure(NppOwner, cfg)) return;
+            if (!ConfirmNotChangedInEpm(cfg, title, new ActiveRule { PlanType = app, Cube = RuleSet.FolderName, RuleName = name })) return;
+            using (var dlg = Forms.DeployProgressForm.ForRuleSet(cfg, app, name, DeployPlan.ForRuleSet(assembled.Xml)))
                 dlg.ShowDialog();
         }
 

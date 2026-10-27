@@ -5,6 +5,22 @@ DLL's file version is `0.15.N.0`.
 
 ## Unreleased
 
+- **RuleSets as `.ruleset.ini`:** Pull writes each RuleSet's settings and runtime prompts
+  (merge variables, hidden, value, override, validation value …) to
+  `Planning\{app}\RuleSets\{RuleSet}.ruleset.ini`, and Deploy from that file puts the RuleSet
+  together from the deployed version of the rules it runs and sends it to Calculation Manager.
+  Before, a RuleSet was pulled as a `.js` holding the script of one of its rules.
+- **Graphical rules — template prompts:** the values a template step passes to the template's
+  design-time prompts are edited in `00 - Rule.ini` (`[NN Template X]`, and `[NN Template X ·
+  Prompt]` for member ranges), with allowed values and run-time prompts noted.
+- **Graphical templates** are pulled as read-only folders (step files and `00 - Template.ini`
+  with the prompts and flow) instead of a `.csc` holding only their first script step.
+- **Clearer flow** in `00 - Rule.ini`: rule steps name the rule they run, disabled steps are
+  marked, conditional steps show their condition, and IFs built in the designer show their test
+  (their empty `Test =` line, which was ignored on deploy, is gone).
+- Files that must stay read only (template folders, formula steps the format can't hold) stay so
+  when a connection's Read only box is unticked.
+
 - **Update check:** *Check for updates* in the About box asks GitHub for the latest release, and
   at startup (at most once a day) a newer release is announced once, with a link to its page.
   It sends nothing about the user or their work; turn the startup check off in

@@ -44,6 +44,13 @@ namespace CalcStudioEPM.Epm
         internal static DeployPlan Graphical(string ruleXml) =>
             new DeployPlan { Content = "(graphical rule)", RuleXml = ruleXml, Requested = DeployMethod.CmOnly };
 
+        /// <summary>A RuleSet: its whole XML, put together by <see cref="Epm.RuleSet.Assemble"/>.</summary>
+        public bool IsRuleSet { get; private set; }
+
+        /// <summary>A RuleSet goes to Calculation Manager only (deployed to Planning from there).</summary>
+        internal static DeployPlan ForRuleSet(string ruleSetXml) =>
+            new DeployPlan { Content = "(RuleSet)", RuleXml = ruleSetXml, Requested = DeployMethod.CmOnly, IsRuleSet = true };
+
         internal static DeployPlan Create(string localFolder, string content, DeployMethod method)
         {
             var plan = new DeployPlan { Content = content, Requested = method };
