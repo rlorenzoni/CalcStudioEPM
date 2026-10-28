@@ -5,6 +5,17 @@ DLL's file version is `0.15.N.0`.
 
 ## Unreleased
 
+- **Tests and CI:** `CalcStudioEPM.Tests` (MSTest) with `test.bat`: pull round trip on an export of
+  Oracle's demo application, IPM, validators, file names; Corpus tests on whole local pulls via
+  `CALCSTUDIO_TEST_DATA` / `CALCSTUDIO_TEST_IPM`. GitHub Actions build and test every push and pull
+  request, and a `v0.015.N` tag drafts a release with the plugin zip. `/p:KeepBuildNumber=true`
+  builds without raising the build number.
+- **Fixed — graphical steps nested deep in IFs:** a step's number alone could pass Windows'
+  260-character path limit (`15 2-ELSE 01 2-ELSE 01 … 1-THEN 01`), and the pull skipped it. When
+  the path would be too long the number is now written short (`15-E01-E01-…-T01`); `.flow.json`
+  still maps the file to its step, so deploy is unchanged. Shallow steps keep their full names.
+- **Fixed — empty rules:** a rule whose script was never written (an empty `<script/>`) was
+  reported as changed right after every pull.
 - **IPM — Auto Predict, calendars and events:** a connection option (*IPM*, off by default) adds
   *Update IPM configuration, calendar and events* to the Pull dialog (not ticked by default). It
   exports only those artifacts, as a package of their own (`{Local Folder}\IPM`), and writes

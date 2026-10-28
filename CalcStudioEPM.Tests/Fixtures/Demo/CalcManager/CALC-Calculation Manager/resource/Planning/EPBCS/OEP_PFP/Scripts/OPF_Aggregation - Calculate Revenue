@@ -1,0 +1,8 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules/><components><component type="script" id="1" name="OPF_Aggregation - Calculate Revenue" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_PFP</property><property name="seeded">true</property><script type="calcscript">  Fix([currencyDTP] {Scenario}, @relative("All Years",0), @relative("YearTotal",0))
+    Fix (@relative("OPF_Total Line Items",0))  
+      "OPF_Summary Resources";
+    Endfix 
+    AGG("Project Element");
+  Endfix  
+</script></component></components></HBRRepo>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+   <LOCALE>en</LOCALE>
+   <User name="" password=""/>
+   <ExportedVersion>26.10.117</ExportedVersion>
+   <ExportedDateUTC>20261027</ExportedDateUTC>
+   <ExportedTimeUTC>12:00</ExportedTimeUTC>
+   <ExportedBy>demo.user</ExportedBy>
+   <IDMDomain>demo</IDMDomain>
+   <ServiceInstance>epm</ServiceInstance>
+   <Task>
+      <Source type="FileSystem" filePath="/HP-Vision"/>
+      <Target type="Application" product="HP" project="Default Application Group" application="Vision"/>
+      <Artifact recursive="true" parentPath="/Global Artifacts/Auto Predict" pattern="*"/>
+      <Artifact recursive="false" parentPath="/Global Artifacts" pattern="Calendar"/>
+      <Artifact recursive="false" parentPath="/Global Artifacts" pattern="Events"/>
+   </Task>
+</Package>

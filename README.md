@@ -105,7 +105,36 @@ The release version is set once, in `ReleaseVersion` in `CalcStudioEPM.csproj` (
 | About box, README, GitHub release tag | `0.015.N` | `v0.015.2` |
 | DLL file / assembly version (what Notepad++ Plugin Admin compares) | `0.15.N.0` | `0.15.2.0` |
 
-For a new release change `ReleaseVersion` (keep three digits after the dot: `0.016`, … `0.100`). The build number keeps counting.
+For a new release change `ReleaseVersion` (keep three digits after the dot: `0.016`, … `0.100`). The build number keeps counting. `/p:KeepBuildNumber=true` builds with the number as it is, without raising it (tests and CI do).
+
+### Tests
+
+```cmd
+test.bat
+```
+
+It builds the plugin and `CalcStudioEPM.Tests` (MSTest, without raising the build number) and runs the tests with `vstest.console`; results go to `TestResults\`. No test connects to EPM or needs a connection: they run on made-up packages committed with them, and cover what needs neither EPM nor Notepad++:
+
+- **Pull round trip:** a small package made from an export of Oracle's EPBCS demo application (`CalcStudioEPM.Tests\Fixtures\Demo`: Calc Script, Groovy and graphical rules, templates, a script, a RuleSet), plus two made-up rules — *Nested Branches* (steps up to 12 IFs deep) and *Empty Rule* (an empty script) — is extracted with the current code and read back: nothing may show as changed, also in a long connection folder. Edited scripts and RuleSet `.ini` files must.
+- **IPM:** a made-up package (`Fixtures\Ipm`) is written as `.ini` files and read back unchanged; edits (members, drivers, calendars), error messages and the Planning-only deploy package are checked.
+- **Validators, file names, lists:** Calc Script and Groovy checks with the built-in settings, artifact name encoding, path safety.
+
+**Corpus tests** run the round trip on whole packages already downloaded and kept locally — still no connection (skipped when not set):
+
+```cmd
+set CALCSTUDIO_TEST_DATA=C:\EPM\DEMO
+set CALCSTUDIO_TEST_IPM=C:\EPM\exports\IPM.zip
+test.bat
+```
+
+`CALCSTUDIO_TEST_DATA` is a folder holding a pulled `CalcManager` export (extracted again); `CALCSTUDIO_TEST_IPM` an IPM export `.zip` or folder, with a `dimensions.json` beside it to name the members. `Fixtures\make_demo_fixtures.py` (from a downloaded package) and `make_ipm_fixtures.py` rebuild the fixtures.
+
+### GitHub Actions
+
+- **Build and test** (`.github/workflows/build.yml`) — every push to `main` and every pull request: `test.bat` without the Corpus tests on `windows-latest`; the test results and the built DLL are attached to the run.
+- **Release** (`.github/workflows/release.yml`) — pushing a tag `v0.015.N`: builds and tests, fails unless the tag is the version in the committed `ReleaseVersion` and `BuildNumber.txt`, and creates a **draft** release with `CalcStudioEPM_v0.015.N_x64.zip` (the DLL, Newtonsoft.Json, LICENSE, notices). Publish the draft on GitHub.
+
+`prepare_github.ps1` runs `test.bat` before copying (`-SkipTests` to skip) and copies the tests and workflows too.
 
 ---
 

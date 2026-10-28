@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<IPMCalendars>
+ <IPMCalendar name="Forecast Calendar" description="Forecast periods" modifiedBy="demo.user" >
+ <IPMCalendarDetails><![CDATA[{"id":"11111111-0000-4000-8000-000000000001","planType":["Plan1"],"membersExpression":"ILvl0Descendants(Years)->ILvl0Descendants(YearTotal)","startDate":"FY23->Jul","currentDate":"FY26->Jul","endDate":"FY27->Jun","historicalPeriods":36,"futurePeriods":12,"dateMappingFreq":3,"dateMappingStartDate":"","dims":["Years","Period"]}]]></IPMCalendarDetails>
+</IPMCalendar>
+ <IPMCalendar name="Budget Calendar" description="" modifiedBy="demo.user" >
+ <IPMCalendarDetails><![CDATA[{"id":"11111111-0000-4000-8000-000000000002","planType":["Plan1"],"membersExpression":"IRSiblings(FY24)->ILvl0Descendants(YearTotal)","startDate":"FY24->Jan","currentDate":"&Budget_Year->Jan","endDate":"FY26->Dec","historicalPeriods":24,"futurePeriods":12,"dateMappingFreq":3,"dateMappingStartDate":"2026-01-01","dims":["Years","Period"]}]]></IPMCalendarDetails>
+</IPMCalendar>
+</IPMCalendars>

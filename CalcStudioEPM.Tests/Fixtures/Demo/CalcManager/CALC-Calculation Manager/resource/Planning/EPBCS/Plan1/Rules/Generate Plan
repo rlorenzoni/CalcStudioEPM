@@ -1,0 +1,93 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules><rule id="1" name="Generate Plan" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><statement seq="1" type="component" kind="script" name=""><component type="script" id="-100" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><script type="calcscript">SET UPDATECALC OFF;
+SET AGGMISSG ON;
+
+FIX ("C_101","USD")
+
+	Fix ("OEP_Working")
+	   DATACOPY "OEP_Forecast"->&amp;CurYr To "OEP_Plan"->&amp;NextYr;
+	ENDFIX
+
+	Fix ("OEP_Plan",&amp;NextYr)
+	   CLEARDATA "OEP_Working";
+	ENDFIX
+
+ENDFIX
+
+
+FIX ("OEP_Plan",&amp;NextYr,"USD")
+
+	FIX ("C_101")
+	
+		FIX (@RELATIVE("Product", 0), @RELATIVE("Cost Center", 0), @RELATIVE("Intercompany", 0), @RELATIVE("LoB", 0) )
+	
+			FIX (@RELATIVE("YearTotal", 0))
+
+				/* Revenue*/
+				FIX (@RELATIVE("A_40000", 0))
+					"OEP_Working" = @ROUND("OEP_Forecast"->&amp;CurYr * 1.05,0);
+				ENDFIX
+
+				/* COGS*/               
+                FIX ("A_51100")
+                   "OEP_Working" = @ROUND("A_51100"->"OEP_Forecast"->"YearTotal"->&amp;CurYr/"A_40000"->"OEP_Forecast"->"YearTotal"->&amp;CurYr * "A_40000",0);
+                ENDFIX
+
+
+				/* Salaries*/
+				FIX (@RELATIVE("A_60100", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.04,0);
+				ENDFIX
+
+				/* Other Employee Benefits*/
+				FIX (@RELATIVE("A_60200", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.04,0);
+				ENDFIX
+
+				/* Travel*/
+				FIX (@RELATIVE("A_60500", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.02,0);
+				ENDFIX
+
+				/* Freight and Shipping*/
+				FIX (@RELATIVE("A_62000", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.04,0);
+				ENDFIX
+
+				/* Other Purchases and Supplies*/
+				FIX (@RELATIVE("A_63100", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.02,0);
+				ENDFIX
+
+				/* Office and Communication*/
+				FIX (@RELATIVE("A_64000", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.03,0);
+				ENDFIX
+
+				/* Fees*/
+				FIX (@RELATIVE("A_65000", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.02,0);
+				ENDFIX
+
+				/* Depreciation*/
+				FIX (@RELATIVE("A_68000", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.03,0);
+				ENDFIX
+
+				/* Tax*/
+				FIX (@RELATIVE("A_79001", 0))
+					"OEP_Working" =  @ROUND("OEP_Forecast"->&amp;CurYr * 1.02,0);
+				ENDFIX
+	
+			ENDFIX
+			
+		ENDFIX
+	
+	ENDFIX
+
+ENDFIX
+
+
+FIX ("OEP_Plan",&amp;NextYr,"USD")
+   AGG ("Entity","Cost Center","Product","Intercompany","LoB");
+ENDFIX</script></component></statement></rule></rules><components/><deployobjects><deployobject product="2" application="epbcs" plantype="plan1" obj_id="1" obj_type="1" name="GENERATE PLAN"/></deployobjects></HBRRepo>

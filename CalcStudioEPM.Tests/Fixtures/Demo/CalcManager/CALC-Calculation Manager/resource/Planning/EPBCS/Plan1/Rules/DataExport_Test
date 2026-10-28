@@ -1,0 +1,31 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables><variable name="vscenario" type="member" usage="const" id="1" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><property name="dimension">Scenario</property><property name="prompt_text">select scenario</property><property name="rule_name">DATAEXPORT_TEST</property><property name="scope">ruleset</property><property name="rule">1</property><value>"OEP_Plan"</value><limits type="expression"><property name="value">@IDescendants("OEP_Scenarios")</property></limits></variable><variable name="vyear" type="member" usage="const" id="2" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><property name="dimension">Years</property><property name="prompt_text">Select year</property><property name="rule_name">DATAEXPORT_TEST</property><property name="scope">ruleset</property><property name="rule">1</property><value>FY26</value><limits type="expression"><property name="value">@IDescendants("All Years")</property></limits></variable></variables><rulesets/><rules><rule id="1" name="DataExport_Test" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><variable_references><variable_reference name="vscenario" id="1"><property name="application">EPBCS</property><property name="hasvalue">true</property><property name="hidden">false</property><property name="plantype">Plan1</property><property name="rule">1</property><property name="rule_name">DATAEXPORT_TEST</property><property name="seq">1</property><property name="type">3</property><property name="useAsOverrideValue">false</property></variable_reference><variable_reference name="vyear" id="2"><property name="application">EPBCS</property><property name="hasvalue">true</property><property name="hidden">false</property><property name="plantype">Plan1</property><property name="rule">1</property><property name="rule_name">DATAEXPORT_TEST</property><property name="seq">2</property><property name="type">3</property><property name="useAsOverrideValue">false</property></variable_reference></variable_references><script type="calcscript">SET DATAEXPORTOPTIONS
+  {
+  DataExportLevel ALL;
+  DataExportDynamicCalc OFF;
+  DataExportNonExistingBlocks OFF;
+  DataExportDecimal 2;
+  DataExportPrecision 2;
+  DataExportColFormat ON;
+  DataExportColHeader "Period";
+  DataExportDimHeader ON;
+  DataExportRelationalFile OFF;
+  DataExportOverwriteFile ON;
+  };
+  
+
+FIX
+	(
+	{vscenario},									/* Scenario */
+	{vyear},										/* Years */
+    "Working",				        				/* Version */
+	@Relative("Total Geography",0),	    	    	/* entity */
+    @Relative("Total Product",0),                  	/* product */ 
+    @Relative("A_All_Corp_Acct_V1",0),		    	/* Account */
+    @Relative("YearTotal",0),						/* Period */
+	"USD",                                           /* Currency */
+	"No Cost Center","No InterCompany","No LoB"
+	)
+
+DATAEXPORT "File" "," "/u03/lcm/DEMO_Fin.csv" "0";
+ENDFIX</script></rule></rules><components/><deployobjects><deployobject product="2" application="epbcs" plantype="plan1" obj_id="1" obj_type="1" name="DATAEXPORT_TEST"/></deployobjects></HBRRepo>

@@ -1,0 +1,235 @@
+{
+ "PulledAt": "2026-10-27T00:00:00",
+ "Cubes": {
+  "Plan1": [
+   "Account",
+   "Entity",
+   "Product",
+   "Currency",
+   "Version",
+   "Scenario",
+   "View",
+   "Years",
+   "Period"
+  ]
+ },
+ "ByCube": {
+  "Plan1": {
+   "Account": {
+    "Name": "Account",
+    "DimType": "Generic",
+    "Members": [
+     "Revenue",
+     "Units",
+     "Price",
+     "Cost, Freight"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Revenue",
+      "p": "Total Revenue",
+      "f": {
+       "id": "aaaaaaaa-0000-4000-8000-000000000001"
+      }
+     },
+     {
+      "n": "Units",
+      "p": "Total Revenue",
+      "f": {
+       "id": "aaaaaaaa-0000-4000-8000-000000000002"
+      }
+     },
+     {
+      "n": "Price",
+      "p": "Total Revenue",
+      "f": {
+       "id": "aaaaaaaa-0000-4000-8000-000000000003"
+      }
+     },
+     {
+      "n": "Cost, Freight",
+      "p": "Total Revenue",
+      "f": {
+       "id": "aaaaaaaa-0000-4000-8000-000000000004"
+      }
+     }
+    ]
+   },
+   "Entity": {
+    "Name": "Entity",
+    "DimType": "Generic",
+    "Members": [
+     "North",
+     "South",
+     "No Entity"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "North",
+      "p": "Total Entity",
+      "f": {
+       "id": "eeeeeeee-0000-4000-8000-000000000001"
+      }
+     },
+     {
+      "n": "South",
+      "p": "Total Entity",
+      "f": {
+       "id": "eeeeeeee-0000-4000-8000-000000000002"
+      }
+     },
+     {
+      "n": "No Entity",
+      "p": "Entity",
+      "f": {
+       "id": "eeeeeeee-0000-4000-8000-000000000003"
+      }
+     }
+    ]
+   },
+   "Product": {
+    "Name": "Product",
+    "DimType": "Generic",
+    "Members": [
+     "Product A",
+     "Product B"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Product A",
+      "p": "Total Product",
+      "f": {
+       "id": "bbbbbbbb-0000-4000-8000-000000000001"
+      }
+     },
+     {
+      "n": "Product B",
+      "p": "Total Product",
+      "f": {
+       "id": "bbbbbbbb-0000-4000-8000-000000000002"
+      }
+     }
+    ]
+   },
+   "Currency": {
+    "Name": "Currency",
+    "DimType": "Generic",
+    "Members": [
+     "USD",
+     "No Currency"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "USD",
+      "p": "Currency",
+      "f": {
+       "id": "cccccccc-0000-4000-8000-000000000001"
+      }
+     },
+     {
+      "n": "No Currency",
+      "p": "Currency",
+      "f": {
+       "id": "cccccccc-0000-4000-8000-000000000002"
+      }
+     }
+    ]
+   },
+   "Version": {
+    "Name": "Version",
+    "DimType": "Generic",
+    "Members": [
+     "Final",
+     "Working",
+     "Predicted"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Final",
+      "p": "Version"
+     },
+     {
+      "n": "Working",
+      "p": "Version"
+     },
+     {
+      "n": "Predicted",
+      "p": "Version"
+     }
+    ]
+   },
+   "Scenario": {
+    "Name": "Scenario",
+    "DimType": "Generic",
+    "Members": [
+     "Actual",
+     "Plan",
+     "Forecast"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Actual",
+      "p": "Scenario"
+     },
+     {
+      "n": "Plan",
+      "p": "Scenario"
+     },
+     {
+      "n": "Forecast",
+      "p": "Scenario"
+     }
+    ]
+   },
+   "View": {
+    "Name": "View",
+    "DimType": "Generic",
+    "Members": [
+     "Periodic"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Periodic",
+      "p": "View"
+     }
+    ]
+   },
+   "Years": {
+    "Name": "Years",
+    "DimType": "Generic",
+    "Members": [
+     "FY26"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "FY26",
+      "p": "Years"
+     }
+    ]
+   },
+   "Period": {
+    "Name": "Period",
+    "DimType": "Generic",
+    "Members": [
+     "Jan"
+    ],
+    "Aliases": [],
+    "Nodes": [
+     {
+      "n": "Jan",
+      "p": "YearTotal"
+     }
+    ]
+   }
+  }
+ },
+ "ByName": {}
+}

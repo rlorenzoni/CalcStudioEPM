@@ -1,0 +1,175 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules/><components/><templates><template custom="yes" id="1" name="OCX_AddAsset_Temp" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">AddAsset_Temp</property><property name="seeded">true</property><statement seq="1" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_height">3</property><property name="display_label">(Application == Is Multi C...</property><property name="display_width">3</property><property name="Tile_Key">x1y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>Application</user_inp></expression><expression seq="2"><user_inp>Is Multi Currency</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="formula" name=""><component type="formula" id="-101" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">CurrencyDTP = ,"Local","HS...</property><property name="dtp_assignment">true</property><formulae><conditionblock><formula><destination><user_inp>CurrencyDTP</user_inp></destination><expression><user_inp>,"Local","HSP_InputValue"</user_inp></expression></formula></conditionblock></formulae></component></statement></then><else><statement seq="1" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_height">2</property><property name="display_label">(Application == Is Simple ...</property><property name="display_width">3</property><property name="Tile_Key">x1y1</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>Application</user_inp></expression><expression seq="2"><user_inp>Is Simple Currency</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="formula" name=""><component type="formula" id="-103" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">CurrencyDTP = ,"No Currenc...</property><property name="dtp_assignment">true</property><formulae><conditionblock><formula><destination><user_inp>CurrencyDTP</user_inp></destination><expression><user_inp>,"No Currency"</user_inp></expression></formula><formula><destination><user_inp>CurrenncyDerived</user_inp></destination><expression><user_inp>{Currency} -></user_inp></expression></formula></conditionblock></formulae></component></statement></then></if></statement></else></if></statement><statement seq="2" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="description">DTP assignment for Flex Dim 1</property><property name="caption">1st Fkex Dim</property><property name="display_height">2</property><property name="display_label">1st Fkex Dim</property><property name="display_width">3</property><property name="Tile_Key">x4y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>FlexDim1DTP1</user_inp></expression><expression seq="2"><user_inp>Is Available</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="formula" name=""><component type="formula" id="-105" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">FLexDim1Fix = ,{FLexDim1}
+    ...</property><property name="dtp_assignment">true</property><formulae><conditionblock><formula><destination><user_inp>FLexDim1Fix</user_inp></destination><expression><user_inp>,{FLexDim1}</user_inp></expression></formula><formula><destination><user_inp>FlexDim1Derived</user_inp></destination><expression><user_inp>"No Project"-></user_inp></expression></formula></conditionblock></formulae></component></statement></then></if></statement><statement seq="3" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">2nd Flex Dim</property><property name="display_height">2</property><property name="display_label">2nd Flex Dim</property><property name="display_width">3</property><property name="Tile_Key">x7y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>FlexDim2DTP1</user_inp></expression><expression seq="2"><user_inp>Is Available</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="formula" name=""><component type="formula" id="-107" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">FLexDim2Fix = ,{FlexDim2}
+    ...</property><property name="dtp_assignment">true</property><formulae><conditionblock><formula><destination><user_inp>FLexDim2Fix</user_inp></destination><expression><user_inp>,{FlexDim2}</user_inp></expression></formula><formula><destination><user_inp>FlexDim2Derived</user_inp></destination><expression><user_inp>"No Flex Dimension 2"-></user_inp></expression></formula></conditionblock></formulae></component></statement></then></if></statement><statement seq="4" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">3rd Flex Dim</property><property name="display_height">2</property><property name="display_label">3rd Flex Dim</property><property name="display_width">3</property><property name="Tile_Key">x10y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>FlexDim3DTP1</user_inp></expression><expression seq="2"><user_inp>Is Available</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="formula" name=""><component type="formula" id="-109" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">FLexDim3Fix = ,{FlexDim3}
+    ...</property><property name="dtp_assignment">true</property><formulae><conditionblock><formula><destination><user_inp>FLexDim3Fix</user_inp></destination><expression><user_inp>,{FlexDim3}</user_inp></expression></formula><formula><destination><user_inp>FLexDim3Derived</user_inp></destination><expression><user_inp>"No Flex Dimension 3"-></user_inp></expression></formula></conditionblock></formulae></component></statement></then></if></statement><statement seq="5" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">isHybrid</property><property name="display_height">2</property><property name="display_label">isHybrid</property><property name="display_width">3</property><property name="Tile_Key">x13y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>Essbase Mode</user_inp></expression><expression seq="2"><user_inp>Is Hybrid</user_inp></expression></biop></expression></test><else><statement seq="1" type="component" kind="script" name=""><component type="script" id="-111" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="display_label">Add Intangible</property><script type="calcscript">SET UPDATECALC OFF;</script></component></statement></else></if></statement><statement seq="6" type="if"><if product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">Asset Type</property><property name="display_height">2</property><property name="display_label">Asset Type</property><property name="display_width">3</property><property name="Tile_Key">x16y0</property><property name="use_dtp">true</property><test><expression><biop type="eq"><expression seq="1"><user_inp>AssetType</user_inp></expression><expression seq="2"><user_inp>Tangible</user_inp></expression></biop></expression></test><then><statement seq="1" type="component" kind="script" name=""><component type="script" id="-113" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">Add Tangible</property><property name="display_label">Add Tangible</property><script type="calcscript">SET AGGMISSG ON;
+    VAR membercount = 0;
+    VAR quit = 0;
+    VAR NumItems;
+    VAR newpos = 0;
+    FIX ( {PP_Scenario}, {PP_Version}, {PP_Entity}  [CurrencyDTP][FLexDim1Fix][FLexDim2Fix][FLexDim3Fix]) 
+    FIX ( {AssetClass}) 
+        FIX ( "No Year", "BegBalance") 
+            FIX ( "OCX_Asset Count") 
+                SET CREATEBLOCKONEQ ON;
+                "OCX_No Line Item" ( 
+                    "OCX_Asset Count" = 1;
+                ) 
+                SET CREATEBLOCKONEQ OFF;
+            ENDFIX 
+            FIX ( "OCX_No Line Item") 
+                "OCX_Asset Count" ( 
+                    IF ( {SalvageValue} > {AssetRate}) 
+                        @RETURN( @HspMessage( "ID_Err_06SALVAGE_VALUE_CANNOT_BE_GREATER_THAN_THE_ASSET_RATE66"), ERROR);
+                    ENDIF 
+                    membercount = @COUNT( SKIPNONE, @LIST( @RELATIVE( "OCX_Total New", 0)));
+                ) 
+            ENDFIX 
+            LOOP ( 10000000, quit) 
+            FIX ( "OCX_Asset Count") 
+                "OCX_No Line Item" ( 
+                    NumItems = NumItems + 1;
+                    IF ( NumItems > membercount) 
+                        @RETURN( @HspMessage( "There are no free line items available for new assets. You must add line items to the Asset Details dimension before adding a new asset."), ERROR);
+                    ENDIF 
+                    IF ( @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Count" == #MISSING AND newpos &lt; 1) 
+                        newpos = newpos + 1;
+                        quit = 1;
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Count" = 543;
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Purchase Date" = {PurchaseDate};
+                        IF ( {InServiceDate} &lt; {PurchaseDate}) 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_In Service Date" = {PurchaseDate};
+                        ELSE 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_In Service Date" = {InserviceDate};
+                        ENDIF 
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset ID" = {PP_AssetId};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_CAR No." = {AssetCar};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Justification" = {Justification};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Priority" = {Priority};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Description" = {AssetDesc};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Units" = {AssetUnits};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Rate" = {AssetRate};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Installation" = {Installation};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Freight" = {Freight};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Salvage" = {SalvageValue};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Additional Charges" = {AdditionalCharges};
+                        [CurrenncyDerived]@MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Retirement Obligation" = {RetirementObs};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->[CurrenncyDerived]"OCX_FOG Cost per Year" = {FOGCostPerYear};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Physical Location" = {PhyLocation};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_UOM" = 1;
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Requisition Status" = 1;
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Capacity UOM" = {CapacityUOM};
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Asset Capacity" = {_AssetCapacity};
+                        IF ( [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Useful Life (in Years)" &lt;> #MISSING) 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Useful Life (in Years)" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Useful Life (in Years)";
+                        ELSE 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Useful Life (in Years)" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OEP_No Entity"->"OCX_Global"->"OCX_Useful Life (in Years)";
+                        ENDIF 
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Cash Flow Incidence" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Cash Flow Incidence";
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding Incidence" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding Incidence";
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding %";
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding Staggered Value" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding Staggered Value";
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Cash Staggered Value" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Cash Staggered Value";
+                    ENDIF 
+                ) 
+            ENDFIX 
+            ENDLOOP 
+        ENDFIX 
+        FIX ( @REMOVE([[PlanningFunctions.getModuleStartYear("CAPITAL",{PP_Scenario})]]:[[PlanningFunctions.getModuleEndYear("CAPITAL",{PP_Scenario})]],"No Year"), "BegBalance") 
+            FIX ( "OCX_Asset Units") 
+                "OCX_No Line Item" ( 
+                    IF ( "YR-Index" >= @MOD( @INT( ({PurchaseDate}-"First Date")/10000), 100)) 
+                        @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->[CurrenncyDerived]"OCX_FOG Cost per Year" = {FOGCostPerYear};
+                        IF ( {InsurancePercent} != #MISSING) 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Insurance %" = {InsurancePercent};
+                        ELSE 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Insurance %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Insurance %";
+                        ENDIF 
+                        IF ( {RepairsPercent} != #MISSING) 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Repairs %" = {RepairsPercent};
+                        ELSE 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Repairs %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Repairs %";
+                        ENDIF 
+                        IF ( {MaintenancePercent} != #MISSING) 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Maintenance %" = {MaintenancePercent};
+                        ELSE 
+                            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Maintenance %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Maintenance %";
+                        ENDIF 
+                    ENDIF 
+                ) 
+            ENDFIX   
+ 
+        ENDFIX   
+ 
+    ENDFIX   
+    ENDFIX </script></component></statement></then><else><statement seq="1" type="component" kind="script" name=""><component type="script" id="-114" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_CPX</property><property name="caption">Add Intangible</property><property name="display_label">Add Intangible</property><script type="calcscript">VAR numAsset = 1;
+    VAR validLineItem = 0; 
+    VAR newBlock = 0;
+    VAR CurPos = 0;
+    VAR NumItems = 0;
+ 
+    FIX ({PP_Scenario},{AssetClassInt},{PP_Version},@CHILDREN("OCX_Total New"),{PP_Entity}[CurrencyDTP][FLexDim1Fix][FLexDim3Fix][FLexDim2Fix])
+    FIX ("BegBalance" )
+    FIX ("No Year")
+      SET CREATENONMISSINGBLK ON;
+      "OCX_Asset Description"(
+        NumItems = NumItems + 1;
+        IF (numAsset > 0 AND @MAXS(SKIPMISSING, @CHILDREN("OCX_Asset Properties")) == #MISSING AND ("OCX_Asset Count" == #MISSING) ) 
+            numAsset = numAsset - 1;
+            CurPos = NumItems;
+            IF ( {SalvageValue} > {AcquisitionCost}) 
+                @RETURN( @HspMessage("ID_Err_06SALVAGE_VALUE_CANNOT_BE_GREATER_THAN_THE_ASSET_RATE66"), ERROR);
+            ENDIF 
+            "OCX_Asset Requisition Status" = [[OCX_ApprovalStatus.New]] ;
+            validLineItem = 1;
+            "OCX_Asset Count" = 1;
+            "OCX_Asset Description" = {AssetDesc};
+            "OCX_CAR No." = {AssetCAR};
+            "OCX_Justification" = {Justification};
+             "OCX_Priority" = {Priority};
+            "OCX_Asset Units" = 1;
+            [CurrenncyDerived]"OCX_Installation" = {Installation};
+            [CurrenncyDerived]"OCX_Freight" = {Freight};
+            [CurrenncyDerived]"OCX_Salvage" = {SalvageValue};
+            [CurrenncyDerived]"OCX_Additional Charges" = {AdditionalCharges};
+            [CurrenncyDerived]"OCX_Acquisition Costs" = {AcquisitionCost};
+            [CurrenncyDerived]"OCX_Retirement Obligation" = {RetirementObs};
+            "OCX_Physical Location" = {PhyLocation};
+             // "OCX_Basic Cost" = "OCX_Additional Charges" + "Acquisitional Costs";
+            "OCX_Useful Life (in Years)" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Useful Life (in Years)";
+            "OCX_Purchase Date" = {PurchaseDate};
+            "OCX_In Service Date" = {InServiceDate}; 
+            IF ("OCX_In Service Date" &lt; "OCX_Purchase Date") 
+                "OCX_In Service Date" = "OCX_Purchase Date";
+            ENDIF
+            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Cash Flow Incidence" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Cash Flow Incidence";
+            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding Incidence" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding Incidence";
+            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding %";
+            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Funding Staggered Value" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Funding Staggered Value";
+            @MEMBER( @HspNthMbr( @name( @relative("OCX_Total New",0 )), NumItems))->"OCX_Cash Staggered Value" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Cash Staggered Value";
+        ENDIF    
+        )
+      SET CREATENONMISSINGBLK OFF;
+    ENDFIX
+    FIX(@REMOVE([[PlanningFunctions.getModuleStartYear("CAPITAL",{PP_Scenario})]]:[[PlanningFunctions.getModuleEndYear("CAPITAL",{PP_Scenario})]],"No Year"))
+      SET CREATENONMISSINGBLK ON;
+      "OCX_FOG Cost per Year"(
+        IF (@ISMBR(@MEMBER(@HspNthMbr(@name(@relative("OCX_Total New", 0)), CurPos))))
+            IF ({InsurancePercent} != #MISSING)
+                "OCX_Insurance %" = {InsurancePercent};
+            ELSE
+                "OCX_Insurance %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Insurance %";
+            ENDIF
+            IF ({MaintenancePercent} != #MISSING)
+                "OCX_Maintenance %" = {MaintenancePercent};
+            ELSE
+                "OCX_Maintenance %" = [FlexDim1Derived][FlexDim2Derived][FlexDim3Derived]"OCX_Global"->"OCX_Maintenance %";
+            ENDIF
+        ENDIF
+      )
+      SET CREATENONMISSINGBLK OFF;
+    ENDFIX 
+ 
+    ENDFIX
+ 
+    ENDFIX   </script></component></statement></else></if></statement><template_wizard><wizard_step name="Select Asset Type" seq="0"><template_prompts><restricted_prompt name="AssetType"/></template_prompts></wizard_step></template_wizard><template_prompts><restricted_prompt name="Application Type" type="Application Type" isPrompt="no"><property name="is_system">true</property><restricted_prompt_item><property name="prompt">Is Generic</property><property name="value">GENERAL</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is PFP</property><property name="value">PROJECT</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is PSB</property><property name="value">PSB</property></restricted_prompt_item></restricted_prompt><restricted_prompt name="Application" type="Application" isPrompt="no"><property name="is_system">true</property><value>Is Single Currency</value><restricted_prompt_item><property name="prompt">Is Multi Currency</property><property name="value">multi</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is Single Currency</property><property name="value">single</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is Simple Currency</property><property name="value">simple</property></restricted_prompt_item></restricted_prompt><template_slice_prompt name="UpperPOV" type="Member Range" isPrompt="false"><property name="is_system">true</property></template_slice_prompt><restricted_prompt name="Essbase Mode" type="Essbase Mode" isPrompt="no"><property name="is_system">true</property><restricted_prompt_item><property name="prompt">Is Hybrid</property><property name="value">Hybrid</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is NonHybrid</property><property name="value">NonHybrid</property></restricted_prompt_item></restricted_prompt><restricted_prompt name="AssetType" type="Restricted List" isPrompt="yes"><property name="is_system">false</property><property name="isMandatory">true</property><property name="isreadOnly">false</property><property name="prompt_text">ID_PRMTEXT_ASSET_TYPE_07</property><restricted_prompt_item><property name="prompt">Tangible</property><property name="value">1</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Intangible</property><property name="value">2</property></restricted_prompt_item></restricted_prompt><template_prompt name="CurrencyDTP" type="String" isPrompt="false"><property name="is_system">false</property><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt><template_prompt name="ProjMember" type="String" isPrompt="false"/><template_prompt name="ProjectDTP" type="String" isPrompt="false"/><template_prompt name="CurrencyDerived" type="String" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt><template_prompt name="FlexDim1DTP" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>Project</value><dimension name="Project"/></template_prompt><template_prompt name="FlexDim1DTP1" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>[FlexDim1DTP]</value><dimension name="[FlexDim1DTP]"/><dependency><property name="name">FlexDim1DTP</property><property name="type">Inclusive</property></dependency></template_prompt><template_prompt name="FlexDim2DTP" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>Flex Dimension 2</value><dimension name="Flex Dimension 2"/></template_prompt><template_prompt name="FlexDim2DTP1" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>[FlexDim2DTP]</value><dimension name="[FlexDim2DTP]"/><dependency><property name="name">FlexDim2DTP</property><property name="type">Inclusive</property></dependency></template_prompt><template_prompt name="FlexDim3DTP" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>Flex Dimension 3</value><dimension name="Flex Dimension 3"/></template_prompt><template_prompt name="FlexDim3DTP1" type="Dimension" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property><value>[FlexDim3DTP]</value><dimension name="[FlexDim3DTP]"/><dependency><property name="name">FlexDim3DTP</property><property name="type">Inclusive</property></dependency></template_prompt><template_prompt name="FLexDim1Fix" type="String" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt><template_prompt name="FLexDim2Fix" type="String" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt><template_prompt name="FLexDim3Fix" type="String" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt><template_prompt name="FlexDim1Derived" type="String" isPrompt="false"/><template_prompt name="FlexDim2Derived" type="String" isPrompt="false"/><template_prompt name="FLexDim3Derived" type="String" isPrompt="false"/><template_prompt name="CurrenncyDerived" type="String" isPrompt="false"><property name="isMandatory">false</property><property name="isreadOnly">false</property></template_prompt></template_prompts></template></templates></HBRRepo>

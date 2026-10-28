@@ -1,0 +1,61 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules><rule id="1" name="Planning to SM" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_FS</property><script type="groovy">//------------------------------------------------------------------------------
+// Create Planning grid
+//------------------------------------------------------------------------------
+Cube cube = operation.application.getCube("OEP_FS")
+
+def strPlanYr1 = cube.getSubstitutionVariableValue("PlanYr1")
+def strSPYr1 = '20'+ strPlanYr1.substring(2,4)
+
+DataGridDefinitionBuilder defBuilder = cube.dataGridDefinitionBuilder()
+
+defBuilder.addPov(['Years', 'Scenario', 'Currency', 'Version', 'Entity', 'Market', 'Plan Element', 'Product'],
+[ [strPlanYr1], ['OEP_Plan'], ['USD'], ['OEP_Working'], ['Sales US'], ['All Market'], ['OFS_Total Plan'], ['All Product'] ])
+
+defBuilder.addColumn(['Period'], [ ['YearTotal'] ])
+defBuilder.addRow(['Account'], [ ['OFS_Product Revenue', 'OFS_Services Revenue','OFS_Support Revenue','OFS_Adjustments to Revenue','OFS_Total Cost of Sales','OFS_Other Revenue'] ])
+
+DataGridDefinition gridDefinition = defBuilder.build()
+DataGrid grid = cube.loadGrid(gridDefinition, true)
+
+double millionsScalingFactor = 1 // 0.000001
+
+// Push to Strategic Model
+def data = []
+grid.dataCellIterator().each{
+  //  println "Members = " + it.memberNames + " data = " + it.data
+    data &lt;&lt; it.data * millionsScalingFactor
+}
+
+ double valFor010 = data[0] as double
+// double valFor020 = data[1]
+int i = 0
+(1..4).each{println(data[i++])}
+
+ println("v1000:010 $valFor010")
+//println("v1000:020 $valFor020")
+
+//---------------------------------------------------------------
+// Create the SM model grid
+//---------------------------------------------------------------
+operation.application.getStrategicModel('Sales US').withCloseable { smModel ->
+DataGridBuilder gridBuilder = smModel.dataGridBuilder()
+gridBuilder.addPov('Forecast')
+gridBuilder.addColumn(strSPYr1)
+
+gridBuilder.addRow(['v1000:010'], [data[0]])
+gridBuilder.addRow(['v1000:020'], [data[1]])
+gridBuilder.addRow(['v1020'], [data[3]])
+gridBuilder.addRow(['v1040'], [data[4]])
+ 
+double supportRevenue = data[2] as double
+double otherRevenue = data[5] as double
+double totalSupportOtherRevenue = supportRevenue + otherRevenue
+gridBuilder.addRow(['v1000:030'], [totalSupportOtherRevenue])
+
+
+DataGridBuilder.Status status = new DataGridBuilder.Status()
+grid = gridBuilder.build(status)
+
+smModel.saveGrid(grid)
+}//close smModel</script></rule></rules><components/><deployobjects><deployobject product="2" application="epbcs" plantype="oep_fs" obj_id="1" obj_type="1" name="PLANNING TO SM"/></deployobjects></HBRRepo>

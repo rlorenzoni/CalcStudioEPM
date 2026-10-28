@@ -1,0 +1,9 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules><rule id="1" name="Clear Actuals" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><statement seq="1" type="component" kind="script" name=""><component type="script" id="-100" name="" product="Planning"><property name="application">EPBCS</property><property name="plantype">Plan1</property><script type="calcscript">/* Script to clear Fusion data for actuals*/
+
+FIX ("OEP_Actual",&amp;PriorYr,&amp;CurYr,@RELATIVE("YearTotal",0),@RELATIVE("A_T",0),"C_101")
+   CLEARDATA "OEP_Working";
+ENDFIX
+
+
+</script></component></statement></rule></rules><components/><deployobjects><deployobject product="2" application="epbcs" plantype="plan1" obj_id="1" obj_type="1" name="CLEAR ACTUALS"/></deployobjects></HBRRepo>

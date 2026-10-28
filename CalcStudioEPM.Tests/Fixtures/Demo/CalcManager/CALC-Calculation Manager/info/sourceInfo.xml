@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sourceInfo>
+   <Application>CalcApp</Application>
+   <Product>CALC</Product>
+   <ProductVersion>11.1.2.3</ProductVersion>
+   <Project>Foundation</Project>
+   <usesFriendlyNames>false</usesFriendlyNames>
+   <metadataFileSupported>false</metadataFileSupported>
+   <groupingSupported>true</groupingSupported>
+   <LCMVersion>11.1.2</LCMVersion>
+</sourceInfo>

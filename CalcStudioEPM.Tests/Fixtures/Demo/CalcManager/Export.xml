@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+   <LOCALE>en</LOCALE>
+   <User name="" password=""/>
+   <Task>
+      <Source type="Application" product="CALC" project="Foundation" application="Calculation Manager"/>
+      <Target type="FileSystem" filePath="/CALC-Calculation Manager"/>
+      <Artifact recursive="true" parentPath="/" pattern="*"/>
+   </Task>
+</Package>

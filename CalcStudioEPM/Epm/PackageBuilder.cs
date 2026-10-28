@@ -287,6 +287,14 @@ $@"<?xml version=""1.0"" encoding=""UTF-8""?>
             catch { return ""; }
         }
 
+        /// <summary>True when the XML is a script rule or template — it has a &lt;script&gt;, even an
+        /// empty one (a rule whose script was never written).</summary>
+        public static bool HasScript(string ruleXml)
+        {
+            try { return FindScriptElement(XDocument.Parse(ruleXml)) != null; }
+            catch { return false; }
+        }
+
         /// <summary>
         /// True when the editor content differs from the deployed script, ignoring
         /// line-ending style and trailing whitespace at the end of the file.

@@ -104,7 +104,7 @@ namespace CalcStudioEPM.Epm
                 }
                 string text = File.ReadAllText(f, Encoding.UTF8);
                 string xml  = File.ReadAllText(xmlPath, Encoding.UTF8);
-                bool differs = PackageBuilder.ScriptOf(xml).Length > 0
+                bool differs = PackageBuilder.HasScript(xml)                    // also an empty <script/>
                     ? PackageBuilder.HasUndeployedChanges(text, xml)
                     : Norm(text) != Norm(xml);                               // an artifact copied as-is
                 if (differs) result.Add(new Change { File = f, Relative = rel, Reason = "changed" });

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+   <LOCALE>en</LOCALE>
+   <User name="" password=""/>
+   <Task>
+      <Source type="Application" product="HP" project="Default Application Group" application="Vision"/>
+      <Target type="FileSystem" filePath="/HP-Vision"/>
+      <Artifact recursive="true" parentPath="/Global Artifacts/Auto Predict" pattern="*"/>
+      <Artifact recursive="false" parentPath="/Global Artifacts" pattern="Calendar"/>
+      <Artifact recursive="false" parentPath="/Global Artifacts" pattern="Events"/>
+   </Task>
+</Package>

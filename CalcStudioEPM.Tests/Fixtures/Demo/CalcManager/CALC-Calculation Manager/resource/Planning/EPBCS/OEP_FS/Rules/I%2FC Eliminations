@@ -1,0 +1,25 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables><variable name="Currency" type="member" usage="const" id="4" product="Planning"><property name="application">EPBCS</property><property name="allowMissing">false</property><property name="dimension">Currency</property><property name="dimensionInputMode">type</property><property name="dimensionType">Currency</property><property name="prompt_text">ID_PRMTEXT_ENTER_CURRENCY07</property><property name="seeded">true</property><property name="useLastValue">true</property><value/></variable><variable name="Scenario" type="member" usage="const" id="1" product="Planning"><property name="application">EPBCS</property><property name="dimensionType">Scenario</property><property name="prompt_text">ID_PRMTEXT_SCENARIO</property><property name="seeded">true</property><property name="useLastValue">false</property><value/></variable><variable name="Version" type="member" usage="const" id="2" product="Planning"><property name="application">EPBCS</property><property name="dimensionType">Version</property><property name="prompt_text">ID_PRMTEXT_VERSION</property><property name="seeded">true</property><property name="useLastValue">false</property><value/></variable><variable name="YearVar" type="member" usage="const" id="3" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_FS</property><property name="dimension">Years</property><property name="prompt_text">Year</property><property name="scope">ruleset</property><value/></variable></variables><rulesets/><rules><rule id="1" name="I/C Eliminations" product="Planning"><property name="application">EPBCS</property><property name="plantype">OEP_FS</property><variable_references><variable_reference name="YearVar" id="3"><property name="application">EPBCS</property><property name="hidden">false</property><property name="plantype">OEP_FS</property><property name="rule_name">I/C Eliminations</property><property name="seq">1</property><property name="type">3</property><property name="useAsOverrideValue">false</property><property name="validation_value">FY20</property></variable_reference><variable_reference name="Currency" id="4"><property name="application">EPBCS</property><property name="hidden">false</property><property name="rule_name">I/C Eliminations</property><property name="seq">2</property><property name="type">3</property><property name="useAsOverrideValue">false</property></variable_reference><variable_reference name="Scenario" id="1"><property name="application">EPBCS</property><property name="hidden">false</property><property name="rule_name">I/C Eliminations</property><property name="seq">3</property><property name="type">3</property><property name="useAsOverrideValue">false</property></variable_reference><variable_reference name="Version" id="2"><property name="application">EPBCS</property><property name="hidden">false</property><property name="rule_name">I/C Eliminations</property><property name="seq">4</property><property name="type">3</property><property name="useAsOverrideValue">false</property></variable_reference></variable_references><script type="calcscript">SET CALCPARALLEL 3;
+set updatecalc off;
+set aggmissg on;
+
+FIX(@Relative("ICP_Total Company", 0), "Elim",{Scenario},{Version},{YearVar},@relative("Yeartotal",0),{Currency})
+   CLEARDATA "I/C Revenue";
+   CLEARDATA "I/C Cost of Sales";
+ENDFIX
+
+FIX("I/C Revenue","I/C Cost of Sales",@Relative("ICP_Total Company", 0), @Relative("Total Company", 0),{Scenario},{Version},{YearVar},@relative("Yeartotal",0),{Currency},@relative("All Product",0))
+"Elim"(
+@Member(@Concatenate("E_",@Name(@MemberAt(@Intersect(@Ancestors(@CurrMbr(Entity)),@Ancestors(@Member(@SubString(@Name(@CurrMbr(Market)),4)))),1)))) 
+
+		=
+
+@Member(@Concatenate("E_",@Name(@MemberAt(@Intersect(@Ancestors(@CurrMbr(Entity)),@Ancestors(@Member(@SubString(@Name(@CurrMbr(Market)),4)))),1)))) - "OFS_Total";
+      )
+ENDFIX
+
+FIX(@Relative("Total", 0),"OFS_Direct Input","Elim",{Scenario},{Version},{YearVar},@relative("Yeartotal",0),{Currency})
+   @Idescendants("Entity");
+   @Idescendants("Total Market");
+   @Idescendants("Product");
+ENDFIX</script></rule></rules><components/><deployobjects><deployobject product="2" application="epbcs" plantype="oep_fs" obj_id="1" obj_type="1" name="I/C ELIMINATIONS"/></deployobjects></HBRRepo>

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests of the plugin's logic that needs neither EPM Cloud nor Notepad++: pull extraction and
+    read-back, RuleSets, graphical rules, IPM (Auto Predict, calendars, packages), validators,
+    file names. Fixtures\ holds small exports (see the make_*.py scripts there); with
+    CALCSTUDIO_TEST_DATA / CALCSTUDIO_TEST_IPM set, the Corpus tests also run on whole pulls.
+
+    Run them with test.bat (builds with /p:KeepBuildNumber=true, then vstest).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.6.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.6.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built with the build number as it is: running the tests doesn't use one up -->
+    <ProjectReference Include="..\CalcStudioEPM\CalcStudioEPM.csproj" AdditionalProperties="KeepBuildNumber=true" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Fixtures\**\*" />
+    <Compile Remove="Fixtures\**\*" />
+  </ItemGroup>
+
+</Project>

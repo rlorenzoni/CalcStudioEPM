@@ -7,3 +7,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyProduct("CalcStudio for Oracle EPM")]
 [assembly: AssemblyCopyright("Copyright © 2026 Rafael Lorenzoni. Licensed under GPL-3.0.")]
 [assembly: ComVisible(false)]
+
+// The tests (CalcStudioEPM.Tests) exercise the internal pull / deploy / validation logic
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CalcStudioEPM.Tests")]

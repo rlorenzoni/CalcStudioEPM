@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+ <APBatch createdBy="demo.user" name="Revenue - Forecast" modifiedBy="demo.user" generateReport="false" isAnomalyInsightJob="true" isAutoPredictJob="true" isHistoricalInsightJob="true" isMovementVarianceInsightJob="false" isPredictionInsightJob="false" isMultivariateJob="false" savePrediction="false" calendarUuid="11111111-0000-4000-8000-000000000001" calendarName="Forecast Calendar" >
+ <description>Univariate forecast with insights</description>
+ <SliceMapping sliceDefType="Historical forecast slice" planType="1" >
+ <MbrSelection>Actual,Working,Periodic,ILvl0Descendants(Total Revenue),ILvl0Descendants(Total Entity),No Product,USD</MbrSelection>
+</SliceMapping>
+ <SliceMapping sliceDefType="Historical data source slice" planType="1" >
+ <MbrSelection>Actual,Final,Periodic,ILvl0Descendants(Total Revenue),ILvl0Descendants(Total Entity),No Product,USD</MbrSelection>
+</SliceMapping>
+ <SliceMapping sliceDefType="Base prediction target slice" planType="1" >
+ <MbrSelection>Forecast,Predicted,Periodic,ILvl0Descendants(Total Revenue),ILvl0Descendants(Total Entity),No Product,USD</MbrSelection>
+</SliceMapping>
+ <APBatchDateRange historicalPeriod="36" dateScenario="" futurePeriod="12" >
+ <startDate year="FY26" dateSelectionType="Specific start or end periods end" period="Jul" >
+</startDate>
+ <endDate year="FY27" dateSelectionType="Specific start or end periods end" period="Jun" >
+</endDate>
+</APBatchDateRange>
+ <InsightResource emailNotificationRequired="false" advanceSetting="false" predictionTaskRequired="true" >
+ <DisplayDimension>Scenario,Version,Entity</DisplayDimension>
+ <MagnitudeOfImpact low="0.1" high="0.3" impactThresholdType="1" ></MagnitudeOfImpact>
+ <InsightConfigs>
+ <InsightConfig type="2" includeEvents="false" >
+ <InsightMeasure threshold="3.0" metric="11" type="3" >
+</InsightMeasure>
+</InsightConfig>
+</InsightConfigs>
+</InsightResource>
+ <APPredictionOptions><![CDATA[{"adjustOutliers":true,"adjustNegativePredictions":false,"useAIRecommendation":false,"fillInMissingValues":true,"includeEvents":false,"accuracyThreshold":0.0,"predictionPeriodOverride":false,"minimumMissingValueThreshold":50.0,"periodsPerCycle":0,"yearlySeasonalOverride":false,"seasonalMethods":true,"nonSeasonalMethods":true,"arima":true,"arimaExtendedSearch":false,"fillMissingLastPeriodHistData":0,"isImputeFutureValues":false,"isEnableFeatureSelection":true}]]></APPredictionOptions>
+</APBatch>

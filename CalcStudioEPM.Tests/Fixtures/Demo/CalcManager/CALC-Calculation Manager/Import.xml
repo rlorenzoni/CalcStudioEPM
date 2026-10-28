@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+   <LOCALE>en</LOCALE>
+   <User name="" password=""/>
+   <ExportedVersion>26.10.117</ExportedVersion>
+   <ExportedDateUTC>20261027</ExportedDateUTC>
+   <ExportedTimeUTC>12:06</ExportedTimeUTC>
+   <ExportedBy>demoadmin</ExportedBy>
+   <IDMDomain>demo</IDMDomain>
+   <ServiceInstance>epm</ServiceInstance>
+   <Task>
+      <Source type="FileSystem" filePath="/"/>
+      <Target type="Application" product="CALC" project="Foundation" application="Calculation Manager"/>
+      <Artifact recursive="true" parentPath="/" pattern="*"/>
+   </Task>
+</Package>

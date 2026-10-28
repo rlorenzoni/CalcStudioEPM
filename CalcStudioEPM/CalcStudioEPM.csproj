@@ -23,6 +23,9 @@
       file and assembly version       : 0.15.N.0  (what Plugin Admin's "version" must match)
 
     The values are written to obj\…\BuildInfo.g.cs (class CalcStudioEPM.BuildInfo).
+
+    /p:KeepBuildNumber=true builds with the number in BuildNumber.txt as it is and doesn't raise
+    it: CI and test runs, so a release built from a tag has the version of its last local build.
   -->
   <PropertyGroup Label="Version">
     <ReleaseVersion>0.015</ReleaseVersion>
@@ -33,7 +36,8 @@
     <PropertyGroup>
       <_LastBuild Condition="Exists('$(BuildNumberFile)')">$([System.IO.File]::ReadAllText('$(BuildNumberFile)').Trim())</_LastBuild>
       <_LastBuild Condition="'$(_LastBuild)' == ''">0</_LastBuild>
-      <BuildNumber>$([MSBuild]::Add($(_LastBuild), 1))</BuildNumber>
+      <BuildNumber Condition="'$(KeepBuildNumber)' == 'true'">$(_LastBuild)</BuildNumber>
+      <BuildNumber Condition="'$(KeepBuildNumber)' != 'true'">$([MSBuild]::Add($(_LastBuild), 1))</BuildNumber>
       <_ReleaseMajor>$([System.Version]::Parse('$(ReleaseVersion)').Major)</_ReleaseMajor>
       <_ReleaseMinor>$([System.Version]::Parse('$(ReleaseVersion)').Minor)</_ReleaseMinor>
       <_FileVersion>$(_ReleaseMajor).$(_ReleaseMinor).$(BuildNumber).0</_FileVersion>
@@ -61,7 +65,7 @@
   </Target>
 
   <!-- The number is kept only once the code compiled, so a failed build doesn't use one up -->
-  <Target Name="SaveBuildNumber" AfterTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true' And '$(BuildNumber)' != ''">
+  <Target Name="SaveBuildNumber" AfterTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true' And '$(BuildNumber)' != '' And '$(KeepBuildNumber)' != 'true'">
     <WriteLinesToFile File="$(BuildNumberFile)" Lines="$(BuildNumber)" Overwrite="true" />
   </Target>
 

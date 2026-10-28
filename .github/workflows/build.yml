@@ -1,0 +1,37 @@
+# Builds the plugin and runs the tests on every push to main and every pull request.
+# The build number is kept as committed (KeepBuildNumber), so CI never changes BuildNumber.txt.
+# The Corpus tests need private pulls (CALCSTUDIO_TEST_DATA / _IPM) and run locally only.
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test
+        shell: cmd
+        run: test.bat /TestCaseFilter:"TestCategory!=Corpus"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+
+      - name: Upload the plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: CalcStudioEPM-${{ github.sha }}
+          path: |
+            CalcStudioEPM/bin/x64/Release/net48/CalcStudioEPM.dll
+            CalcStudioEPM/bin/x64/Release/net48/Newtonsoft.Json.dll
+            LICENSE
+            THIRD-PARTY-NOTICES.md

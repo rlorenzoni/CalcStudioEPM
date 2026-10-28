@@ -1,0 +1,61 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<HBRRepo><variables/><rulesets/><rules/><components/><deployobjects><deployobject product="2" application="epbcs" plantype="oep_fs" obj_id="1" obj_type="19" name="OFS_GRIDMEMBERSELECTION_GT"/></deployobjects><templates><template custom="yes" id="1" name="OFS_GridMemberSelection_GT" product="Planning"><property name="description">This groovy template is used in out of box rules and templates. So any customization to this groovy template may cause regressions.</property><property name="application">EPBCS</property><property name="plantype">OEP_FS</property><property name="formBusinessRule">false</property><property name="formCallback">false</property><property name="formContextMenu">false</property><property name="protected">false</property><property name="seeded">true</property><property name="standAlone">false</property><property name="systemCallback">false</property><script type="groovy">class GridMemberSelection {
+	DataGrid grid
+	Map&lt;String, String> povDimNameToMemberNameMap
+	List&lt;Map&lt;String, String>> rowsDimNameToMemberNameMapList
+	Map&lt;String, List&lt;String>> columnsDimNameToMembersMap = [:]
+	GridMemberSelection(DataGrid grid) {
+		this.grid = grid
+		Closure&lt;Map&lt;String, String>> dimNameToMemberSelectionMap = { List&lt;DataGrid.HeaderCell> headerCells ->
+			headerCells?.collectEntries { [ (it.dimName) : it.mbrName ] }
+		}
+		this.povDimNameToMemberNameMap = dimNameToMemberSelectionMap(grid.pov)
+		this.rowsDimNameToMemberNameMapList = grid.rows.collect {dimNameToMemberSelectionMap(it.headers)}
+		grid.columns.each {List&lt;DataGrid.HeaderCell> it -> columnsDimNameToMembersMap.put(it.get(0).dimName, it*.mbrName as ArrayList)}
+	}
+
+	String getPovSelection(String dimName) {
+		povDimNameToMemberNameMap?.get(dimName)
+	}
+
+	List&lt;String> getColumnSelection(String dimName) {
+		List&lt;String> columnSelectionSet = columnsDimNameToMembersMap?.get(dimName)
+		columnSelectionSet ? columnSelectionSet : null
+	}
+
+	List&lt;String> getRowSelection(String dimName) {
+		List&lt;String> rowSelectionListWithDuplicates = rowsDimNameToMemberNameMapList*.get(dimName)
+		rowSelectionListWithDuplicates ? rowSelectionListWithDuplicates : null
+	}
+
+	List&lt;String> getMemberSelection(String dimName) throws Exception{
+		String povSelection = getPovSelection(dimName)
+		List&lt;String> memberSelection = povSelection ? [povSelection] : (getColumnSelection(dimName)?:getRowSelection(dimName))
+		if(memberSelection) {
+			return memberSelection
+		} else {
+			throw new Exception("Dimension: " + dimName + " isn't present in the grid.")
+		}
+	}
+
+	String getMemberFromSelection(String dimName) throws Exception {
+		List&lt;String> memberSelection = getMemberSelection(dimName)
+		if(memberSelection.size() > 1) {
+			throw new Exception("Dimension: " + dimName + " has multiple members in the selection but you can have only a single member.")
+		}
+		memberSelection.get(0)
+	}
+
+	List&lt;String> getMemberSelectionWithLeafMembers(Cube financialsCube, Application application, String dimName) throws Exception{
+		List&lt;String> memberelection = getMemberSelection(dimName)
+		Dimension dimension = application.getDimension(dimName, financialsCube)
+		if(!dimension) {
+			//FIXME:Not able to throw Veto exception
+			throw new Exception("Dimension: " + dimName + " isn't present in the grid.")
+		}
+		//FIXME:Beter way to get Levl0 members
+		return memberelection?.findAll { !dimension.getEvaluatedMembers("Descendants("+it+")", financialsCube) }
+	}
+}
+
+	</script><template_wizard/><template_prompts><restricted_prompt name="Application Type" type="Application Type" isPrompt="no"><property name="is_system">true</property><restricted_prompt_item><property name="prompt">Is Generic</property><property name="value">GENERAL</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is PFP</property><property name="value">PROJECT</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is PSB</property><property name="value">PSB</property></restricted_prompt_item></restricted_prompt><restricted_prompt name="Application" type="Application" isPrompt="no"><property name="is_system">true</property><value>Is Single Currency</value><restricted_prompt_item><property name="prompt">Is Multi Currency</property><property name="value">multi</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is Single Currency</property><property name="value">single</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is Simple Currency</property><property name="value">simple</property></restricted_prompt_item></restricted_prompt><template_slice_prompt name="UpperPOV" type="Member Range" isPrompt="false"><property name="is_system">true</property></template_slice_prompt><restricted_prompt name="Essbase Mode" type="Essbase Mode" isPrompt="no"><property name="is_system">true</property><restricted_prompt_item><property name="prompt">Is Hybrid</property><property name="value">Hybrid</property></restricted_prompt_item><restricted_prompt_item><property name="prompt">Is NonHybrid</property><property name="value">NonHybrid</property></restricted_prompt_item></restricted_prompt></template_prompts></template></templates></HBRRepo>

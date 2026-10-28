@@ -19,6 +19,7 @@ namespace CalcStudioEPM.Epm
     ///      01 - {caption}.csc           a script step, exactly as Calculation Manager holds it
     ///      02 - {caption}.formula.csc   a formula step: one  "Dest" = expression;  per row
     ///      01.01.01 1-THEN 01 - ….csc   steps inside FIXes, member blocks and IF branches
+    ///      01-E01-E01-T01 - ….csc       the same, written short when the path would pass 260 characters
     ///      .flow.json                   file → component id / step path (bookkeeping)
     ///
     /// Steps are numbered in flow order. The order and kind of steps, and template steps,
@@ -260,13 +261,31 @@ namespace CalcStudioEPM.Epm
             public readonly List<string> ReadOnlyFiles = new List<string>();
 
             /// <summary>"{num} - {label}{ext}", the label shortened to keep the full path under
-            /// Windows' 260-character limit (just "{num}{ext}" when even that is too long).</summary>
+            /// Windows' 260-character limit (just "{num}{ext}" when even that is too long). A step
+            /// nested deep in IFs has a number too long on its own: it is then written short
+            /// ("15-E01-T01" for "15 2-ELSE 01 1-THEN 01"), or as a hash of it. The manifest maps
+            /// the file to its step either way.</summary>
             private string FileName(string num, string label, string ext)
             {
-                int room = 259 - Folder.Length - 1 - num.Length - 3 - ext.Length;
+                int fits = 259 - Folder.Length - 1 - ext.Length;
+                if (num.Length > fits)
+                {
+                    string full = num;
+                    num = num.Replace(" 1-THEN ", "-T").Replace(" 2-ELSE ", "-E");
+                    if (num.Length > fits) num = "step-" + Fnv(full);
+                }
+                int room = fits - num.Length - 3;
                 string safe = SafeName(label);
                 if (room < 8) return num + ext;
                 return $"{num} - {(safe.Length > room ? safe.Substring(0, room).TrimEnd() : safe)}{ext}";
+            }
+
+            /// <summary>A stable 32-bit FNV-1a hash, in hex (the same on every pull).</summary>
+            private static string Fnv(string s)
+            {
+                uint h = 2166136261;
+                foreach (char c in s) { h ^= c; h *= 16777619; }
+                return h.ToString("x8");
             }
 
             public void Walk(IEnumerable<XElement> statements, string prefix, string path, int depth)

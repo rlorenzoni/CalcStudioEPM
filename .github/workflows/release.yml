@@ -1,0 +1,50 @@
+# On a version tag (v0.015.N): builds and tests, checks the tag is the version being built
+# (ReleaseVersion in the .csproj + the committed BuildNumber.txt), and creates a DRAFT GitHub
+# release with CalcStudioEPM_v0.015.N_x64.zip — review and publish it on GitHub.
+#
+#   git tag v0.015.18 && git push origin v0.015.18
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test
+        shell: cmd
+        run: test.bat /TestCaseFilter:"TestCategory!=Corpus"
+
+      - name: Check the tag is the built version
+        id: version
+        shell: pwsh
+        run: |
+          $release = ([xml](Get-Content CalcStudioEPM/CalcStudioEPM.csproj)).Project.PropertyGroup.ReleaseVersion | Where-Object { $_ } | Select-Object -First 1
+          $build = (Get-Content CalcStudioEPM/BuildNumber.txt -Raw).Trim()
+          $version = "v$release.$build"
+          if ($env:GITHUB_REF_NAME -ne $version) {
+            Write-Error "Tag $env:GITHUB_REF_NAME doesn't match the version built ($version): commit BuildNumber.txt from the release build, or tag $version."
+            exit 1
+          }
+          "zip=CalcStudioEPM_${version}_x64.zip" >> $env:GITHUB_OUTPUT
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $files = 'CalcStudioEPM/bin/x64/Release/net48/CalcStudioEPM.dll', 'CalcStudioEPM/bin/x64/Release/net48/Newtonsoft.Json.dll',
+                   'LICENSE', 'THIRD-PARTY-NOTICES.md'
+          Compress-Archive -Path $files -DestinationPath '${{ steps.version.outputs.zip }}'
+
+      - name: Draft the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: ${{ steps.version.outputs.zip }}
+          generate_release_notes: true
