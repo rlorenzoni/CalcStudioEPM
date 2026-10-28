@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and test
         shell: cmd
@@ -21,17 +21,21 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults/
 
+      # The release zip's four files, side by side at the top of the artifact
+      - name: Collect the plugin files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item CalcStudioEPM/bin/x64/Release/net48/CalcStudioEPM.dll, CalcStudioEPM/bin/x64/Release/net48/Newtonsoft.Json.dll,
+                    LICENSE, THIRD-PARTY-NOTICES.md dist/
+
       - name: Upload the plugin
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CalcStudioEPM-${{ github.sha }}
-          path: |
-            CalcStudioEPM/bin/x64/Release/net48/CalcStudioEPM.dll
-            CalcStudioEPM/bin/x64/Release/net48/Newtonsoft.Json.dll
-            LICENSE
-            THIRD-PARTY-NOTICES.md
+          path: dist/
