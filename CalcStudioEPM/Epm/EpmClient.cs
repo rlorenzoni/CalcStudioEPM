@@ -353,6 +353,63 @@ namespace CalcStudioEPM.Epm
         }
 
         /// <summary>
+        /// Submits an export of only some artifacts of a category (an incremental snapshot):
+        /// POST /interop/rest/v2/migration/categories/artifacts/export with
+        /// <c>selectedArtifacts</c> — artifact paths as the category's artifact list shows them,
+        /// a folder's ending in "/". Poll the response's Job Status link like a category export.
+        /// </summary>
+        public async Task<MigrationExportResponse> ExportMigrationArtifactsAsync(
+            string snapshotName, string categoryName, IEnumerable<string> selectedArtifacts)
+        {
+            var body = new
+            {
+                snapshotName = snapshotName,
+                categories   = new[] { new { categoryName = categoryName, selectedArtifacts = selectedArtifacts.ToArray() } }
+            };
+            try
+            {
+                return await PostAsync<object, MigrationExportResponse>(
+                    $"/interop/rest/{InteropApiV2Version}/migration/categories/artifacts/export", body)
+                    .ConfigureAwait(false);
+            }
+            catch (EpmException) { throw; }
+            catch (Exception ex)
+            {
+                throw new EpmException("Failed to submit migration export: " + ex.Message, ex);
+            }
+        }
+
+        /// <summary>POST with a JSON body returning the raw JSON, with the long download timeout —
+        /// for big responses such as a migration category's artifact tree.</summary>
+        public async Task<string> PostLargeJsonAsync(string relativeUrl, object body)
+        {
+            string url = BuildUrl(relativeUrl);
+            try
+            {
+                var content = new StringContent(JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content })
+                {
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    HttpResponseMessage response = await _downloadClient.SendAsync(request).ConfigureAwait(false);
+                    await EnsureSuccessAsync(response).ConfigureAwait(false);
+                    return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                }
+            }
+            catch (EpmException)
+            {
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new EpmException($"HTTP error calling POST {url}: {ex.Message}", ex);
+            }
+            catch (TaskCanceledException ex)
+            {
+                throw new EpmException($"Request timed out calling POST {url}.", ex);
+            }
+        }
+
+        /// <summary>
         /// Step 1 of 2 for downloading a snapshot.
         /// POST /interop/rest/v2/files/download  body: { "fileName": "&lt;snapshotName&gt;.zip" }
         /// The server queues an async download job and returns status=-1 plus a "Job Status" link.

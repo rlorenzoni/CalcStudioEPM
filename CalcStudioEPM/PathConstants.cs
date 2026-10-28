@@ -35,6 +35,13 @@ namespace CalcStudioEPM
         public const string PlanningDirName = "Planning";
 
         /// <summary>
+        /// IPM (Auto Predict jobs, calendars, events): the folder of its pulled package —
+        /// <c>{LocalFolderPath}\IPM</c>, apart from Calculation Manager's export — and the folder
+        /// of its files to edit inside the scripts root, <c>{name}.Scripts\IPM</c>.
+        /// </summary>
+        public const string IpmDirName = "IPM";
+
+        /// <summary>
         /// Sentinel file created once inside the scripts root so the
         /// "Open Containing Folder as Workspace" NPP command can open
         /// that exact directory without any dialog automation.

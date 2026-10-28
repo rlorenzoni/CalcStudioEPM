@@ -7,13 +7,16 @@ namespace CalcStudioEPM.Forms
     /// <summary>
     /// Asked before every pull: what to update — the calculations (Calculation Manager export
     /// into the scripts folder), the dimensions, members and substitution / user variables used
-    /// by validation and autocomplete (quick), or both — and whether to clear the
-    /// "*.local.NNN.*" copies kept from earlier pulls (only with the calculations).
+    /// by validation and autocomplete (quick), or both; the IPM configuration (Auto Predict),
+    /// calendars and events, when the connection offers them (never ticked to start with) — and
+    /// whether to clear the "*.local.NNN.*" copies kept from earlier pulls (only with the
+    /// calculations or IPM).
     /// </summary>
     public class PullOptionsForm : PluginForm
     {
         private readonly CheckBox _chkCalculations;
         private readonly CheckBox _chkMetadata;
+        private readonly CheckBox _chkIpm;
         private readonly CheckBox _chkClearCopies;
         private readonly Button   _btnPull;
         private readonly int      _localCopies;
@@ -21,13 +24,16 @@ namespace CalcStudioEPM.Forms
         public bool UpdateCalculations => _chkCalculations.Checked;
         /// <summary>Substitution and user variables, and — when the connection downloads them — dimensions and members.</summary>
         public bool UpdateMetadata => _chkMetadata.Checked;
+        /// <summary>Auto Predict jobs, calendars and events, as a package of their own.</summary>
+        public bool UpdateIpm => _chkIpm.Enabled && _chkIpm.Checked;
         /// <summary>Don't copy the earlier "keep both" copies back after the pull.</summary>
         public bool ClearLocalCopies => _chkClearCopies.Enabled && _chkClearCopies.Checked;
 
         /// <param name="withDimensions">The connection downloads dimensions and members.</param>
         /// <param name="dimensionsPulled">When the dimensions were last downloaded; null = never.</param>
         /// <param name="localCopies">How many "*.local.NNN.*" files the scripts folder holds.</param>
-        public PullOptionsForm(string connection, bool withDimensions, DateTime? dimensionsPulled, int localCopies)
+        /// <param name="withIpm">The connection offers IPM (Configure EPM Connection).</param>
+        public PullOptionsForm(string connection, bool withDimensions, DateTime? dimensionsPulled, int localCopies, bool withIpm = false)
         {
             _localCopies    = localCopies;
             Text            = "Pull Calculations — " + connection;
@@ -64,6 +70,14 @@ namespace CalcStudioEPM.Forms
                 : "Used by validation and autocomplete; a quick download. (This connection doesn't download " +
                   "dimensions and members — see Configure EPM Connection.)"));
 
+            _chkIpm = Box("Update IPM configuration, calendar and events", false);
+            _chkIpm.Enabled = withIpm;
+            stack.Controls.Add(_chkIpm);
+            stack.Controls.Add(Note(withIpm
+                ? "Auto Predict jobs, calendars and events, exported as a package of their own and written to the " +
+                  "scripts folder's IPM folder for editing (members by name when the dimensions are downloaded)."
+                : "This connection doesn't download IPM — see Configure EPM Connection."));
+
             _chkClearCopies = Box("Clear local copies" + (localCopies > 0 ? $" ({localCopies} file{(localCopies == 1 ? "" : "s")})" : ""), false);
             stack.Controls.Add(_chkClearCopies);
             stack.Controls.Add(Note(localCopies > 0
@@ -83,6 +97,7 @@ namespace CalcStudioEPM.Forms
 
             _chkCalculations.CheckedChanged += (s, e) => UpdateEnabled();
             _chkMetadata.CheckedChanged     += (s, e) => UpdateEnabled();
+            _chkIpm.CheckedChanged          += (s, e) => UpdateEnabled();
             UpdateEnabled();
 
             Controls.Add(stack);
@@ -90,11 +105,11 @@ namespace CalcStudioEPM.Forms
             CancelButton = cancel;
         }
 
-        /// <summary>Clearing copies only applies with the calculations; Pull needs something to update.</summary>
+        /// <summary>Clearing copies only applies with the calculations or IPM; Pull needs something to update.</summary>
         private void UpdateEnabled()
         {
-            _chkClearCopies.Enabled = _chkCalculations.Checked && _localCopies > 0;
-            _btnPull.Enabled = _chkCalculations.Checked || _chkMetadata.Checked;
+            _chkClearCopies.Enabled = (_chkCalculations.Checked || UpdateIpm) && _localCopies > 0;
+            _btnPull.Enabled = _chkCalculations.Checked || _chkMetadata.Checked || UpdateIpm;
         }
 
         private static CheckBox Box(string text, bool on) =>

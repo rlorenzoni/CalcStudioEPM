@@ -62,6 +62,7 @@ namespace CalcStudioEPM.Config
             public DeployMethod DefaultDeployMethod { get; set; }
             public bool PullDimensionMembers { get; set; }
             public bool ReadOnly { get; set; }
+            public bool PullIpm { get; set; }
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Password { get; set; }
         }
@@ -105,7 +106,7 @@ namespace CalcStudioEPM.Config
                     Name = c.Name, ServiceBaseUrl = c.ServiceBaseUrl, Application = c.Application,
                     Username = c.Username, SavePassword = c.SavePassword, LocalFolderPath = c.LocalFolderPath,
                     DefaultDeployMethod = c.DefaultDeployMethod, PullDimensionMembers = c.PullDimensionMembers,
-                    ReadOnly = c.ReadOnly, Password = password,
+                    ReadOnly = c.ReadOnly, PullIpm = c.PullIpm, Password = password,
                 });
             }
             if (passwords == 0) file.PasswordProtection = null;
@@ -169,7 +170,7 @@ namespace CalcStudioEPM.Config
                 Name = c.Name, ServiceBaseUrl = c.ServiceBaseUrl, Application = c.Application,
                 Username = c.Username, LocalFolderPath = c.LocalFolderPath,
                 DefaultDeployMethod = c.DefaultDeployMethod, PullDimensionMembers = c.PullDimensionMembers,
-                ReadOnly = c.ReadOnly,
+                ReadOnly = c.ReadOnly, PullIpm = c.PullIpm,
                 SavePassword      = password != null,
                 EncryptedPassword = password != null ? ConfigManager.EncryptPassword(password) : string.Empty,
             };

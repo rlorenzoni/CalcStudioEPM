@@ -580,21 +580,28 @@ namespace CalcStudioEPM
             // Folder as Workspace root (or an Explorer window) on it stays valid and shows the new files
 
             // The "keep both" copies from earlier pulls: kept across pulls unless cleared below
-            List<LocalChanges.Change> localCopies;
+            // (the IPM folder's apart: it is pulled on its own)
+            List<LocalChanges.Change> localCopies, ipmCopies = new List<LocalChanges.Change>();
             try { localCopies = LocalChanges.LocalCopies(cfg); }
             catch (Exception ex) { PluginLog("Pull Calculations: could not list local copies: " + ex.Message); localCopies = new List<LocalChanges.Change>(); }
+            if (cfg.PullIpm)
+                try { ipmCopies = IpmService.LocalCopies(cfg); }
+                catch (Exception ex) { PluginLog("Pull Calculations: could not list IPM local copies: " + ex.Message); }
 
             // Options: the calculations, the dimensions / members / variables (dimensions only when
-            // the connection downloads them), and clearing the local copies
-            bool includeCalculations, includeMetadata, clearLocalCopies;
+            // the connection downloads them), IPM (when the connection offers it), and clearing the
+            // local copies
+            bool includeCalculations, includeMetadata, includeIpm, clearLocalCopies;
             using (var options = new PullOptionsForm(string.IsNullOrWhiteSpace(cfg.Name) ? cfg.ServiceBaseUrl : cfg.Name,
                                                      cfg.PullDimensionMembers,
                                                      EpmMetadata.DimensionsPulledAt(cfg.LocalFolderPath),
-                                                     localCopies.Count))
+                                                     localCopies.Count + ipmCopies.Count,
+                                                     withIpm: cfg.PullIpm))
             {
                 if (options.ShowDialog(NppOwner) != DialogResult.OK) return;
                 includeCalculations = options.UpdateCalculations;
                 includeMetadata     = options.UpdateMetadata;
+                includeIpm          = options.UpdateIpm;
                 clearLocalCopies    = options.ClearLocalCopies;
             }
 
@@ -613,7 +620,7 @@ namespace CalcStudioEPM
             // Saved edits that weren't deployed would be replaced: overwrite, or keep both
             // (backed up, then copied back beside EPM's version as {name}.local.NNN{ext}).
             // Earlier .local copies are kept without asking.
-            // (only when the calculations are pulled: otherwise the scripts folder isn't touched)
+            // (only for what is pulled: the calculations' scripts, the IPM folder)
             var keepBoth = new List<LocalChanges.Change>();
             List<LocalChanges.Change> changes = new List<LocalChanges.Change>();
             if (!includeCalculations) localCopies = new List<LocalChanges.Change>();
@@ -621,6 +628,12 @@ namespace CalcStudioEPM
             {
                 try { changes = LocalChanges.Scan(cfg); }
                 catch (Exception ex) { PluginLog("Pull Calculations: could not check for undeployed changes: " + ex.Message); }
+            }
+            if (includeIpm)
+            {
+                localCopies = localCopies.Concat(ipmCopies).ToList();
+                try { changes = changes.Concat(IpmService.Scan(cfg)).ToList(); }
+                catch (Exception ex) { PluginLog("Pull Calculations: could not check IPM for undeployed changes: " + ex.Message); }
             }
             // Cleared copies are still backed up (just not copied back)
             List<LocalChanges.Change> copiesBack = clearLocalCopies ? new List<LocalChanges.Change>() : localCopies;
@@ -641,7 +654,7 @@ namespace CalcStudioEPM
                 }
             }
 
-            using (var form = new Forms.PullProgressForm(cfg, includeCalculations, includeMetadata, includeDimensions))
+            using (var form = new Forms.PullProgressForm(cfg, includeCalculations, includeMetadata, includeDimensions, includeIpm))
             {
                 form.ShowDialog();
                 succeeded = form.Succeeded;
@@ -686,6 +699,14 @@ namespace CalcStudioEPM
 
             ConnectionConfig cfg = ConnectionForRuleTab(title);
             if (cfg == null) return;
+
+            // An IPM file: an Auto Predict job runs as a Planning job of its own
+            string ipmPath = GetActiveFilePath(silent: true);
+            if (IpmFiles.KindOf(ipmPath, out _) != IpmFiles.Kind.None)
+            {
+                ExecuteIpm(cfg, title, ipmPath);
+                return;
+            }
 
             // ── Which rule? Same resolution as Deploy Active Tab ──────────────
             string editorContent = GetScintillaText();
@@ -978,6 +999,11 @@ namespace CalcStudioEPM
             }
 
             string activePath = GetActiveFilePath(silent: true);
+            if (IpmFiles.KindOf(activePath, out _) != IpmFiles.Kind.None)
+            {
+                DeployIpm(cfg, title, activePath);
+                return;
+            }
             if (RuleSet.IsRuleSetIni(activePath))
             {
                 DeployRuleSet(cfg, title, activePath);
@@ -1120,6 +1146,116 @@ namespace CalcStudioEPM
             if (!PasswordForm.Ensure(NppOwner, cfg)) return;
             if (!ConfirmNotChangedInEpm(cfg, title, new ActiveRule { PlanType = app, Cube = RuleSet.FolderName, RuleName = name })) return;
             using (var dlg = Forms.DeployProgressForm.ForRuleSet(cfg, app, name, DeployPlan.ForRuleSet(assembled.Xml)))
+                dlg.ShowDialog();
+        }
+
+        /// <summary>
+        /// Deploys an IPM file — an Auto Predict job's .autopredict.ini, Calendars.ini or
+        /// Events.xml — to Planning only (IPM is not part of Calculation Manager): applies it to
+        /// the pulled XML, shows what changed, and imports the artifact.
+        /// </summary>
+        private static void DeployIpm(ConnectionConfig cfg, string title, string path)
+        {
+            if (!EnsureActiveTabSaved(title)) return;
+            IpmDeployPlan plan;
+            try { plan = IpmService.Plan(cfg, path); }
+            catch (EpmException ex) { ShowError(title, ex.Message); return; }
+            if (!ConfirmIpmDeploy(title, plan)) return;
+            PluginLog($"Deploy plan for {plan.Label}: changes: {string.Join(" | ", plan.Changes)}; notes: {string.Join(" | ", plan.Notes)}");
+            if (!PasswordForm.Ensure(NppOwner, cfg)) return;
+            using (var dlg = new IpmProgressForm(cfg, plan))
+                dlg.ShowDialog();
+        }
+
+        private static bool ConfirmIpmDeploy(string title, IpmDeployPlan plan)
+        {
+            string List(IEnumerable<string> items, int max = 15)
+            {
+                var all = items.ToList();
+                return "  • " + string.Join("\n  • ", all.Take(max)) + (all.Count > max ? $"\n  … and {all.Count - max} more" : "");
+            }
+            string changes = plan.Changes.Count == 0 ? "Nothing changed since the last pull or deploy." : "Changed:\n" + List(plan.Changes);
+            string notes = plan.Notes.Count == 0 ? "" : "\n\nNote:\n" + List(plan.Notes);
+            return MessageBox.Show(NppOwner,
+                       $"Deploy {plan.Label} to Planning?\n\n{changes}{notes}\n\n" +
+                       "IPM is not part of Calculation Manager: it is imported into Planning only. Only saved files are deployed.",
+                       title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+        }
+
+        /// <summary>
+        /// Runs the Auto Predict job of the active .autopredict.ini as a Planning job, asking for
+        /// its Force run and paginated dimension (remembered per job). Changes that aren't
+        /// deployed can be deployed first.
+        /// </summary>
+        private static void ExecuteIpm(ConnectionConfig cfg, string title, string path)
+        {
+            if (IpmFiles.KindOf(path, out string job) != IpmFiles.Kind.AutoPredict)
+            {
+                ShowInfo(title,
+                    "Calendars and events are deployed (Deploy Active Tab), not executed.\n\n" +
+                    "To run an Auto Predict job, open its file: …\\IPM\\Auto Predict\\{job}" + IpmFiles.AutoPredictSuffix);
+                return;
+            }
+            if (IpmFiles.PulledAutoPredict(cfg.LocalFolderPath, job) == null)
+            {
+                ShowError(title, $"'{job}' isn't in the last IPM pull, so it isn't known to be in EPM. Pull IPM first.");
+                return;
+            }
+            if (!EnsureActiveTabSaved(title)) return;
+
+            IpmDeployPlan deployFirst = null;
+            IpmDeployPlan plan = null;
+            try { plan = IpmService.Plan(cfg, path); }
+            catch (EpmException ex)
+            {
+                if (MessageBox.Show(NppOwner, ex.Message + $"\n\nRun the deployed version of '{job}'?",
+                        title, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    return;
+            }
+            if (plan != null && plan.Changes.Count > 0)
+            {
+                string pending = "  • " + string.Join("\n  • ", plan.Changes.Take(12)) + (plan.Changes.Count > 12 ? "\n  • …" : "");
+                if (cfg.ReadOnly)
+                {
+                    if (MessageBox.Show(NppOwner,
+                            $"'{job}' has changes that aren't deployed, but '{DisplayName(cfg)}' is a read-only connection, " +
+                            $"so they can't be deployed:\n{pending}\n\nRun the deployed version?",
+                            title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                        return;
+                }
+                else
+                    using (var choice = new ChoiceForm(title,
+                               $"'{job}' has changes that aren't deployed:\n{pending}\n\n" +
+                               "Deploy them to Planning first, or run the version EPM has?",
+                               new[] { "Deploy and run", "Run deployed", "Cancel" }, defaultButton: 0, cancelButton: 2))
+                    {
+                        choice.ShowDialog(NppOwner);
+                        if (choice.Choice == 2) return;
+                        if (choice.Choice == 0) deployFirst = plan;
+                    }
+            }
+
+            // forceRun and paginatedDim, remembered per job
+            string forceKey = $"{IpmService.AutoPredictJobType}|{job}|forceRun", dimKey = $"{IpmService.AutoPredictJobType}|{job}|paginatedDim";
+            Dictionary<string, string> last = PromptValues.Load(cfg.LocalFolderPath);
+            last.TryGetValue(forceKey, out string lastForce);
+            last.TryGetValue(dimKey, out string lastDim);
+            bool forceRun;
+            string dimension;
+            using (var form = new AutoPredictRunForm(job, IpmService.PaginationDimensions(cfg, job), lastForce, lastDim))
+            {
+                if (form.ShowDialog(NppOwner) != DialogResult.OK) return;
+                forceRun  = form.ForceRun;
+                dimension = form.PaginatedDimension;
+            }
+            PromptValues.Save(cfg.LocalFolderPath, new Dictionary<string, string>
+            {
+                [forceKey] = forceRun ? "true" : "false",
+                [dimKey]   = dimension,
+            });
+
+            if (!PasswordForm.Ensure(NppOwner, cfg)) return;
+            using (var dlg = new IpmProgressForm(cfg, deployFirst, job, forceRun, dimension))
                 dlg.ShowDialog();
         }
 

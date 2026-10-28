@@ -69,5 +69,9 @@ namespace CalcStudioEPM.Config
         /// <summary>A connection to look at, not change (e.g. production): pulled files are
         /// marked read-only on disk and Deploy is disabled. Pull and Execute still work.</summary>
         public bool ReadOnly { get; set; }
+
+        /// <summary>Offer the IPM artifacts on Pull: Auto Predict jobs, calendars and events, exported
+        /// as their own package and written to {Connection}.Scripts\IPM for editing. Off by default.</summary>
+        public bool PullIpm { get; set; }
     }
 }

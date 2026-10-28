@@ -155,6 +155,7 @@ The plugin was renamed from `NppEPMPlugin` to `CalcStudioEPM`.
    - **Default Deploy Method** — new connections try to deploy the Planning final calculation too (CM+HP)
    - **Validation** — new connections download dimensions and members on Pull, to check member names
    - **Read only** — for a connection to look at, not change (e.g. production). Pulled files under `{Local Folder}\CalcManager` are marked read-only on disk, so Notepad++ opens them locked. Deploy is disabled: its button and menu item are greyed out on that connection's tabs, and the command refuses. Execute runs the deployed version. Ticking or unticking it on Save applies it to the files already pulled; the status bar shows "(read only)" after the connection name.
+   - **IPM** — offers the IPM configuration (Auto Predict jobs), calendars and events on Pull (see [IPM](#ipm-auto-predict-calendars-and-events)). Not ticked by default.
 3. Click **Test Connection** to verify credentials.
 4. Click **Save**. Changing the local folder of a saved connection moves it there (files are not moved).
 
@@ -245,6 +246,46 @@ From the start, the substitution / user variables (and, when asked, dimensions a
 
 ---
 
+## IPM: Auto Predict, calendars and events
+
+With **IPM** ticked on the connection, the Pull dialog offers **Update IPM configuration, calendar and events** (not ticked by default). It exports only Planning's *Global Artifacts › Auto Predict*, *Calendar* and *Events*, as a **package of their own** (snapshot `IPM_…`, deleted after the download), and runs last, after the dimensions, so member IDs can be shown as names:
+
+- **Pulled package:** `{Local Folder}\IPM\` (`Import.xml`, `HP-{app}\…`): EPM's XML, the base of every deploy. It is apart from `CalcManager`, so a calculations pull never touches it.
+- **Files to edit:** `{Local Folder}\CalcManager\{Connection}.Scripts\IPM\`
+  - `Auto Predict\{job}.autopredict.ini` — one per job
+  - `Calendars.ini` — one section per calendar (members, start / current / end, periods, date mapping, cubes, dimensions)
+  - `Events.xml` — as EPM exports it
+
+An Auto Predict `.ini` follows the steps of EPM's wizard:
+
+```ini
+[1 Types]            ; Description, Generate predictions, the four insights
+[2 Calendar]         ; Calendar, Historical / Future periods, Start / End (FY26->Sep)
+[3 Historical Data]  ; Define Model Scope: Version = Final, View = Monthly, …
+[3 Historical Data | Output | AMP]
+Input type = Cell Value
+Calendar = Budget Calendar2
+Account = AMP
+Customer Segmentation = NDPs, Reactivated, Retained
+…
+[3 Historical Data | Driver | Marketing]
+[4 Future Data]      ; Define Model Scope (where predictions go), Fitted values
+[4 Future Data | Output | AMP]   ; the members used for the future (e.g. Data Source = Data Input)
+[5 Prepare Data]     ; Predict missing input driver values, feature engineering, AMP | Missing values = zero …
+[6 Model Settings]   ; the other prediction options (algorithms, errorMeasure …)
+```
+
+- **Members by name:** EPM stores the members of outputs and drivers by member ID. With dimensions and members downloaded, they are names; a member it can't name is written `{id:…}` and kept. Typing a value lists members: on a dimension's line that dimension's, in a list (`Members =`, `Fitted values =`) every dimension's, after `Calendar =` the calendars.
+- **Outputs and drivers:** one section each, in order. Add a driver with a new `[3 Historical Data | Driver | name]` section (its `[4 Future Data | …]` section is optional: without it the future copies the historical members); delete its sections to remove it. An empty dimension line removes that dimension.
+- **A line left out keeps its value.** Settings the `.ini` doesn't show (insight thresholds, report flags …) stay as EPM has them: Deploy applies the `.ini` to the pulled XML. Switching to or from *Advanced Predictions* is done in EPM.
+- **Deploy** (from any of these files) lists what changed and imports **into Planning only** — IPM is not part of Calculation Manager. The package holds just `HP-{app}` and that one artifact. After the import the deployed XML becomes the pulled one. Auto Predict jobs and calendars are created in EPM, then pulled; a new `Calendars.ini` section adds a calendar (with a new ID); a removed section is kept as it is.
+- **Execute** (from an `.autopredict.ini`) runs the job: `POST …/applications/{app}/jobs` with `{"jobType": "Auto Predict", "jobName": …, "parameters": {"forceRun": …, "paginatedDim": …}}`. It asks for **Force run** (true / false) and the **Paginated dimension** (a dimension of the job's calendar's cube), prefilled with the answers last given for that job. Changes that aren't deployed can be deployed first.
+- **Saved changes** in the IPM folder that weren't deployed get the same *Overwrite / Keep both* choice on the next IPM pull.
+
+Why `.ini`: it is what RuleSets and graphical rules use already; Notepad++ highlights it; sections can follow the wizard; one line per setting diffs well; members are names, not IDs. Its limits — no nesting, no lists — are why outputs and drivers are `[step | role | name]` sections and lists are comma-separated (a name with a comma goes in "quotes"). Anything it can't hold stays in the pulled XML.
+
+---
+
 ## Changed in EPM since your pull
 
 Before Deploy (and before Execute's "deploy my changes first"), the plugin asks EPM whether the rule was changed after your last pull, or after your own last deploy of it. If it was, it says who and when before you overwrite their work, e.g. *'TMP_RL_2' was changed in EPM by jdoe on 2026-10-22 14:05 (EPM time), after your last pull*. You can then cancel and pull first, or deploy anyway.
@@ -306,6 +347,8 @@ The main calls (Planning REST API v3; pull and deploy also use the Migration / L
 | List applications | GET | `/HyperionPlanning/rest/v3/applications` |
 | Submit job | POST | `/HyperionPlanning/rest/v3/applications/{app}/jobs` |
 | Poll job status | GET | `/HyperionPlanning/rest/v3/applications/{app}/jobs/{jobId}` |
+| IPM: find the artifacts | GET / POST | `/interop/rest/v2/migration/categories/list`, `…/categories/artifacts/list` |
+| IPM: export them | POST | `/interop/rest/v2/migration/categories/artifacts/export` (`selectedArtifacts`) |
 | Download outbox file | GET | `/interop/rest/v1/files/outbox/{fileName}` |
 
 Authentication: HTTP Basic (`Authorization: Basic base64(user:password)`).

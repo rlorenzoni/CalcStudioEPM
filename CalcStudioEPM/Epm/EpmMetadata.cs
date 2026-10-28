@@ -37,6 +37,13 @@ namespace CalcStudioEPM.Epm
             [JsonProperty("a", NullValueHandling = NullValueHandling.Ignore)] public string Alias  { get; set; }
             /// <summary>Parent member; the dimension name for its top-level members.</summary>
             [JsonProperty("p")] public string Parent { get; set; }
+            /// <summary>Every other field Planning sent for the member (id, storage, formula …), as
+            /// received; arrays and objects as compact JSON. Null in files from before it was kept.</summary>
+            [JsonProperty("f", NullValueHandling = NullValueHandling.Ignore)] public Dictionary<string, string> Fields { get; set; }
+
+            /// <summary>Planning's member ID (a GUID); null when not downloaded.</summary>
+            [JsonIgnore] public string Id =>
+                Fields == null ? null : Fields.TryGetValue("id", out string id) ? id : Fields.TryGetValue("memberId", out id) ? id : null;
         }
 
         public sealed class DimensionInfo
@@ -52,6 +59,9 @@ namespace CalcStudioEPM.Epm
             public List<string> Aliases { get; set; } = new List<string>();
             /// <summary>The hierarchy in outline order; empty in files from before it was kept.</summary>
             public List<MemberNode> Nodes { get; set; } = new List<MemberNode>();
+            /// <summary>The fields Planning sent for the dimension's own node (see <see cref="MemberNode.Fields"/>).</summary>
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public Dictionary<string, string> Fields { get; set; }
 
             [JsonIgnore] public bool HasHierarchy => Nodes != null && Nodes.Count > 0;
 
@@ -151,7 +161,7 @@ namespace CalcStudioEPM.Epm
                     {
                         if (!union.TryGetValue(d.Name, out DimensionInfo u))
                         {
-                            union[d.Name] = u = new DimensionInfo { Name = d.Name, DimType = d.DimType };
+                            union[d.Name] = u = new DimensionInfo { Name = d.Name, DimType = d.DimType, Fields = d.Fields };
                             seenNode[d.Name] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                         }
                         foreach (MemberNode n in d.Nodes ?? new List<MemberNode>())
@@ -277,6 +287,30 @@ namespace CalcStudioEPM.Epm
                     _memberIndex[key] = index;
                 }
                 return index.TryGetValue(name, out var found) ? (IReadOnlyList<string>)found : new string[0];
+            }
+        }
+
+        private Dictionary<string, (DimensionInfo Dim, MemberNode Node)> _byId;
+
+        /// <summary>The member with this Planning member ID (its first position in the outline), in
+        /// any cube; null when unknown or the dimensions were downloaded without IDs.</summary>
+        public (DimensionInfo Dim, MemberNode Node)? MemberById(string id)
+        {
+            if (!HasDimensions || string.IsNullOrEmpty(id)) return null;
+            lock (_memberIndex)
+            {
+                if (_byId == null)
+                {
+                    var map = new Dictionary<string, (DimensionInfo, MemberNode)>(StringComparer.OrdinalIgnoreCase);
+                    foreach (DimensionInfo d in Dims.ByName.Values)
+                        foreach (MemberNode n in d.Nodes ?? new List<MemberNode>())
+                        {
+                            string nid = n.Id;
+                            if (!string.IsNullOrEmpty(nid) && !map.ContainsKey(nid)) map[nid] = (d, n);
+                        }
+                    _byId = map;
+                }
+                return _byId.TryGetValue(id.Trim(), out var hit) ? hit : ((DimensionInfo, MemberNode)?)null;
             }
         }
 

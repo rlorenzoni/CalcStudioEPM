@@ -5,6 +5,14 @@ DLL's file version is `0.15.N.0`.
 
 ## Unreleased
 
+- **IPM — Auto Predict, calendars and events:** a connection option (*IPM*, off by default) adds
+  *Update IPM configuration, calendar and events* to the Pull dialog (not ticked by default). It
+  exports only those artifacts, as a package of their own (`{Local Folder}\IPM`), and writes
+  `{Connection}.Scripts\IPM\Auto Predict\{job}.autopredict.ini` — sections in the order of EPM's
+  Auto Predict wizard, members by name with autocomplete — plus `Calendars.ini` and `Events.xml`.
+  Deploy imports them into Planning only (IPM is not part of Calculation Manager); Execute runs an
+  Auto Predict job (`jobType: "Auto Predict"`), asking Force run and the paginated dimension and
+  remembering the answers per job. A pull of the calculations leaves the IPM folder alone.
 - **RuleSets as `.ruleset.ini`:** Pull writes each RuleSet's settings and runtime prompts
   (merge variables, hidden, value, override, validation value …) to
   `Planning\{app}\RuleSets\{RuleSet}.ruleset.ini`, and Deploy from that file puts the RuleSet
@@ -20,6 +28,10 @@ DLL's file version is `0.15.N.0`.
   (their empty `Test =` line, which was ignored on deploy, is gone).
 - Files that must stay read only (template folders, formula steps the format can't hold) stay so
   when a connection's Read only box is unticked.
+- **Member IDs and properties:** the dimension download keeps every field Planning sends for a
+  member (its ID, storage, formula …), shown under *From EPM* in the Dimension Navigator's
+  details; the navigator's search also finds a pasted member ID. Pull dimensions and members
+  again to get them.
 
 - **Update check:** *Check for updates* in the About box asks GitHub for the latest release, and
   at startup (at most once a day) a newer release is announced once, with a link to its page.

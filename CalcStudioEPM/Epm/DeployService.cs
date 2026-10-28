@@ -201,7 +201,7 @@ namespace CalcStudioEPM.Epm
         /// Uploads the package as a snapshot (4-step EPM v2 protocol), starts the LCM import and
         /// waits for it. Throws <see cref="EpmException"/> when any of it fails.
         /// </summary>
-        private static async Task UploadAndImportAsync(
+        internal static async Task UploadAndImportAsync(
             EpmClient client, string snapshotName, byte[] zipBytes, string what,
             DeployResult result, IProgress<string> progress, IProgress<DeployStep> steps)
         {
@@ -296,7 +296,7 @@ namespace CalcStudioEPM.Epm
         /// Deletes the temporary snapshot — best-effort, never fails the deploy.
         /// Returns null on success, otherwise a short reason.
         /// </summary>
-        private static async Task<string> CleanUpSnapshotAsync(
+        internal static async Task<string> CleanUpSnapshotAsync(
             EpmClient client, string snapshotName, IProgress<string> progress)
         {
             progress?.Report($"Deleting temporary snapshot '{snapshotName}'…");

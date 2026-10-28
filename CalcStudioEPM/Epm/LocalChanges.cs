@@ -37,7 +37,8 @@ namespace CalcStudioEPM.Epm
         private static string ResourceRoot(string localFolder) =>
             Path.Combine(localFolder, PathConstants.CalcManagerDirName, "CALC-Calculation Manager", "resource");
 
-        /// <summary>The saved, undeployed changes in the connection's scripts folder (empty when none).</summary>
+        /// <summary>The saved, undeployed changes in the connection's scripts folder (empty when none).
+        /// The IPM folder is not part of it: see <see cref="IpmService.Scan"/>.</summary>
         public static List<Change> Scan(ConnectionConfig cfg)
         {
             var result = new List<Change>();
@@ -47,6 +48,7 @@ namespace CalcStudioEPM.Epm
 
             // Graphical rules: a folder with .flow.json, compared step by step
             var graphical = Directory.EnumerateFiles(root, GraphicalRule.ManifestName, SearchOption.AllDirectories)
+                                     .Where(f => !IpmFiles.IsInEditDir(root, f))
                                      .Select(Path.GetDirectoryName).ToList();
             foreach (string dir in graphical)
             {
@@ -75,6 +77,7 @@ namespace CalcStudioEPM.Epm
             foreach (string f in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
             {
                 if (IsLocalCopy(f) || Path.GetFileName(f).StartsWith(".") ||          // .epm_workspace and other helpers
+                    IpmFiles.IsInEditDir(root, f) ||                                  // pulled and deployed on its own
                     graphical.Any(g => f.StartsWith(g + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))) continue;
                 string rel = Rel(root, f);
                 if (RuleSet.IsRuleSetIni(f))
@@ -109,12 +112,13 @@ namespace CalcStudioEPM.Epm
             return result.OrderBy(c => c.Relative, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        /// <summary>Earlier "keep both" copies, kept across pulls without asking.</summary>
+        /// <summary>Earlier "keep both" copies, kept across pulls without asking (the IPM folder's:
+        /// see <see cref="IpmService.LocalCopies"/>).</summary>
         public static List<Change> LocalCopies(ConnectionConfig cfg)
         {
             string root = PathConstants.GetScriptsRootPath(cfg.LocalFolderPath, cfg.Name);
             if (!Directory.Exists(root)) return new List<Change>();
-            return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Where(IsLocalCopy)
+            return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Where(f => IsLocalCopy(f) && !IpmFiles.IsInEditDir(root, f))
                             .Select(f => new Change { File = f, Relative = Rel(root, f), Reason = "local copy" }).ToList();
         }
 

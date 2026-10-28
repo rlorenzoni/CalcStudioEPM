@@ -13,8 +13,9 @@ namespace CalcStudioEPM.Forms
     /// <summary>
     /// Browse the dimensions and members downloaded on Pull: pick a cube and a dimension,
     /// walk the hierarchy (loaded as nodes are expanded, so large dimensions stay fast),
-    /// search names and aliases, see a member's parent, path, children and shared positions,
-    /// and insert it at the cursor. Modeless: it stays open next to the script.
+    /// search names, aliases and member IDs, see a member's parent, path, children, shared
+    /// positions and every field Planning sent for it (ID, storage …), and insert it at the
+    /// cursor. Modeless: it stays open next to the script.
     /// </summary>
     public class DimensionNavigatorForm : PluginForm
     {
@@ -353,7 +354,8 @@ namespace CalcStudioEPM.Forms
                     foreach (var n in pool)
                     {
                         bool hit = n.Name.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                   (n.Alias != null && n.Alias.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+                                   (n.Alias != null && n.Alias.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                   string.Equals(n.Id, q, StringComparison.OrdinalIgnoreCase);   // a pasted member ID
                         if (!hit) continue;
                         if (++found > MaxResults) break;
                         _results.Items.Add(new ListViewItem(new[] { n.Name, n.Alias ?? "", d.Name, n.Parent ?? "" })
@@ -363,7 +365,7 @@ namespace CalcStudioEPM.Forms
                     }
                     if (found > MaxResults) break;
                 }
-                _lblStatus.Text = found == 0 ? $"No member or alias contains \"{q}\"."
+                _lblStatus.Text = found == 0 ? $"No member, alias or member ID matches \"{q}\"."
                                 : found > MaxResults ? $"More than {MaxResults} matches — showing the first {MaxResults}. Type more to narrow it."
                                 : $"{found} match{(found == 1 ? "" : "es")} for \"{q}\".";
             }
@@ -415,7 +417,23 @@ namespace CalcStudioEPM.Forms
                 }
                 sb.AppendLine($"In cubes:   {string.Join(", ", cubes)}");
             }
+            AppendFields(sb, r.Node == null ? r.Dim.Fields : r.Node.Fields);
             _txtDetails.Text = sb.ToString();
+        }
+
+        /// <summary>Every field Planning sent for the member or dimension, as received.</summary>
+        private void AppendFields(StringBuilder sb, Dictionary<string, string> fields)
+        {
+            sb.AppendLine();
+            if (fields == null || fields.Count == 0)
+            {
+                if (_md.HasDimensions) sb.AppendLine("From EPM:   pull dimensions and members again to see the member's ID and properties");
+                return;
+            }
+            sb.AppendLine("From EPM:");
+            int width = Math.Min(28, fields.Keys.Max(k => k.Length));
+            foreach (var kv in fields)
+                sb.AppendLine($"  {kv.Key.PadRight(width)}  {kv.Value.Replace("\r", "").Replace("\n", "\r\n  " + new string(' ', width + 2))}");
         }
 
         private string SelectedName() => _selected == null ? null : (_selected.Node?.Name ?? _selected.Dim.Name);

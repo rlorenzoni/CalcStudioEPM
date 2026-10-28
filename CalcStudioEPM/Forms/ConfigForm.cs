@@ -51,6 +51,7 @@ namespace CalcStudioEPM.Forms
         private ComboBox _cboDeployMethod;
         private CheckBox _chkPullMembers;
         private CheckBox _chkReadOnly;
+        private CheckBox _chkPullIpm;
         private Button   _btnBrowse;
 
         private Label    _lblStatus;
@@ -92,14 +93,14 @@ namespace CalcStudioEPM.Forms
             Text            = "CalcStudio — Connections";
             MaximizeBox     = false;
             StartPosition   = FormStartPosition.CenterParent;
-            Size            = new Size(760, 514);
+            Size            = new Size(760, 544);
             AllowResize("Connections");
 
             var layout = new TableLayoutPanel
             {
                 Dock        = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount    = 13,
+                RowCount    = 14,
                 Padding     = new Padding(10),
             };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150f));
@@ -116,8 +117,9 @@ namespace CalcStudioEPM.Forms
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f)); // 8  Default Deploy Method
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f)); // 9  Validation metadata
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f)); // 10 Read only
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f)); // 11 Status (takes extra height)
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38f)); // 12 Buttons
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30f)); // 11 IPM
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f)); // 12 Status (takes extra height)
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38f)); // 13 Buttons
 
             // ── Row 0: connection selector ──────────────────────────────── //
             var connPanel = new FlowLayoutPanel
@@ -267,7 +269,17 @@ namespace CalcStudioEPM.Forms
             };
             layout.Controls.Add(_chkReadOnly, 1, 10);
 
-            // ── Row 11: Status ──────────────────────────────────────────── //
+            // ── Row 11: IPM ─────────────────────────────────────────────── //
+            layout.Controls.Add(MakeLabel("IPM:"), 0, 11);
+            _chkPullIpm = new CheckBox
+            {
+                Text     = "Also download IPM configuration (Auto Predict), calendars and events (offered on Pull)",
+                AutoSize = true,
+                Anchor   = AnchorStyles.Left,
+            };
+            layout.Controls.Add(_chkPullIpm, 1, 11);
+
+            // ── Row 12: Status ──────────────────────────────────────────── //
             _lblStatus = new Label
             {
                 Dock         = DockStyle.Fill,
@@ -276,9 +288,9 @@ namespace CalcStudioEPM.Forms
                 AutoEllipsis = true,
             };
             layout.SetColumnSpan(_lblStatus, 2);
-            layout.Controls.Add(_lblStatus, 0, 11);
+            layout.Controls.Add(_lblStatus, 0, 12);
 
-            // ── Row 12: Buttons ──────────────────────────────────────────── //
+            // ── Row 13: Buttons ──────────────────────────────────────────── //
             var btnPanel = new FlowLayoutPanel
             {
                 Dock          = DockStyle.Fill,
@@ -297,7 +309,7 @@ namespace CalcStudioEPM.Forms
             _btnTest.Click += OnTestClick;
             btnPanel.Controls.AddRange(new Control[] { _btnClose, _btnSave, _btnTest });
             layout.SetColumnSpan(btnPanel, 2);
-            layout.Controls.Add(btnPanel, 0, 12);
+            layout.Controls.Add(btnPanel, 0, 13);
 
             Controls.Add(layout);
             CancelButton = _btnClose;
@@ -426,6 +438,7 @@ namespace CalcStudioEPM.Forms
                 _cboDeployMethod.SelectedIndex = (int)DeployMethod.CmAndHp;
                 _chkPullMembers.Checked = true;
                 _chkReadOnly.Checked = false;
+                _chkPullIpm.Checked = false;
                 return;
             }
 
@@ -437,6 +450,7 @@ namespace CalcStudioEPM.Forms
             _cboDeployMethod.SelectedIndex = (int)cfg.DefaultDeployMethod;
             _chkPullMembers.Checked = cfg.PullDimensionMembers;
             _chkReadOnly.Checked = cfg.ReadOnly;
+            _chkPullIpm.Checked = cfg.PullIpm;
 
             _chkSavePassword.Checked = cfg.SavePassword;
             _txtPassword.Text = string.Empty;
@@ -815,6 +829,7 @@ namespace CalcStudioEPM.Forms
                 DefaultDeployMethod = (DeployMethod)Math.Max(0, _cboDeployMethod.SelectedIndex),
                 PullDimensionMembers = _chkPullMembers.Checked,
                 ReadOnly             = _chkReadOnly.Checked,
+                PullIpm              = _chkPullIpm.Checked,
             };
         }
 

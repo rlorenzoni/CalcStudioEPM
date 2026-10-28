@@ -12,7 +12,7 @@ namespace CalcStudioEPM.Forms
     /// Progress dialog for "Pull Calculations" — see <see cref="StepProgressForm{TResult}"/>
     /// for the shared checklist / summary / details behaviour. Its rows follow what is pulled:
     /// the calculation steps, the metadata (variables, dimensions) running in parallel with its
-    /// own live status, or the metadata alone.
+    /// own live status, or the metadata alone — and IPM last, when asked.
     ///
     /// Usage:
     ///   using (var dlg = new PullProgressForm(cfg))
@@ -32,6 +32,7 @@ namespace CalcStudioEPM.Forms
                 case PullStep.Download:       return "Download the export";
                 case PullStep.CleanUp:        return "Remove the temporary export from EPM Cloud";
                 case PullStep.ExtractScripts: return "Extract the calculation scripts";
+                case PullStep.Ipm:            return "Export IPM configuration, calendars and events, and extract them";
                 default:
                     string what = dimensions ? "variables, dimensions and members" : "substitution and user variables";
                     return parallel ? "In parallel: " + what : "Download " + what;
@@ -39,32 +40,37 @@ namespace CalcStudioEPM.Forms
         }
 
         private readonly ConnectionConfig  _cfg;
-        private readonly bool              _dimensions, _calculations, _metadata;
+        private readonly bool              _dimensions, _calculations, _metadata, _ipm;
         private readonly List<PullStep>    _rows;
         private readonly IProgress<string> _metadataStatus;
 
         /// <param name="includeCalculations">Export Calculation Manager and write the scripts.</param>
         /// <param name="includeMetadata">Substitution and user variables (and dimensions, see next).</param>
         /// <param name="includeDimensions">With the metadata, also dimensions and members.</param>
-        public PullProgressForm(ConnectionConfig cfg, bool includeCalculations, bool includeMetadata, bool includeDimensions)
-            : this(cfg, includeCalculations, includeMetadata, includeDimensions, Rows(includeCalculations, includeMetadata)) { }
+        /// <param name="includeIpm">Export IPM (Auto Predict, calendars, events) as its own package.</param>
+        public PullProgressForm(ConnectionConfig cfg, bool includeCalculations, bool includeMetadata, bool includeDimensions,
+                                bool includeIpm = false)
+            : this(cfg, includeCalculations, includeMetadata, includeDimensions, includeIpm,
+                   Rows(includeCalculations, includeMetadata, includeIpm)) { }
 
-        private PullProgressForm(ConnectionConfig cfg, bool calculations, bool metadata, bool dimensions, List<PullStep> rows)
+        private PullProgressForm(ConnectionConfig cfg, bool calculations, bool metadata, bool dimensions, bool ipm, List<PullStep> rows)
             : base(title:        $"Pull Calculations — {ConnLabel(cfg)}",
                    headline:     calculations ? $"Pulling calculation scripts from {ConnLabel(cfg)}…"
-                                              : $"Updating variables{(dimensions ? " and dimensions" : "")} from {ConnLabel(cfg)}…",
+                                 : !metadata  ? $"Pulling IPM configuration from {ConnLabel(cfg)}…"
+                                              : $"Updating variables{(dimensions ? " and dimensions" : "")}{(ipm ? " and IPM" : "")} from {ConnLabel(cfg)}…",
                    failHeadline: "Pull failed",
                    steps:        rows.Select(r => Label(r, dimensions, parallel: calculations)).ToArray())
         {
-            _cfg = cfg; _calculations = calculations; _metadata = metadata; _dimensions = dimensions; _rows = rows;
+            _cfg = cfg; _calculations = calculations; _metadata = metadata; _dimensions = dimensions; _ipm = ipm; _rows = rows;
             if (metadata) _metadataStatus = ParallelStatus(Row(PullStep.Metadata));
         }
 
-        private static List<PullStep> Rows(bool calculations, bool metadata)
+        private static List<PullStep> Rows(bool calculations, bool metadata, bool ipm)
         {
             var rows = new List<PullStep>();
             if (calculations) rows.AddRange(CalculationSteps);
             if (metadata) rows.Add(PullStep.Metadata);
+            if (ipm) rows.Add(PullStep.Ipm);
             return rows;
         }
 
@@ -79,7 +85,7 @@ namespace CalcStudioEPM.Forms
                 _metadataStatus,
                 m => FinishParallelStep(Row(PullStep.Metadata),
                                         MetadataWarning(m) ? StepState.Warning : StepState.Done, MetadataText(m)),
-                includeCalculations: _calculations, includeMetadata: _metadata);
+                includeCalculations: _calculations, includeMetadata: _metadata, includeIpm: _ipm);
 
         private static bool MetadataWarning(MetadataResult m) => m.VariablesError != null || m.DimensionsError != null;
 
@@ -110,17 +116,45 @@ namespace CalcStudioEPM.Forms
                     pe.CleanupError == null ? "removed" : "could not remove it (see details)");
         }
 
+        private static string IpmText(IpmPullResult p) =>
+            $"{p.AutoPredictJobs} Auto Predict job{(p.AutoPredictJobs == 1 ? "" : "s")}, {p.Calendars} calendar{(p.Calendars == 1 ? "" : "s")}" +
+            (p.Events ? ", events" : "");
+
+        /// <summary>The IPM row and summary line; true when it is a warning.</summary>
+        private bool ShowIpm(PullResult r, out string summary)
+        {
+            summary = "";
+            if (!_ipm) return false;
+            int row = Row(PullStep.Ipm);
+            if (r.IpmError != null || r.Ipm == null)
+            {
+                SetStepState(row, StepState.Warning, "failed (see details)");
+                summary = "\nIPM: " + (r.IpmError ?? "not pulled");
+                return true;
+            }
+            bool warn = r.Ipm.Skipped > 0 || r.Ipm.CleanupError != null;
+            SetStepState(row, warn ? StepState.Warning : StepState.Done,
+                IpmText(r.Ipm) + (r.Ipm.Skipped > 0 ? $"; {r.Ipm.Skipped} skipped" : "") +
+                (r.Ipm.CleanupError != null ? "; export not removed from EPM" : ""));
+            summary = $"\nIPM ({IpmText(r.Ipm)}) is ready to edit in {r.Ipm.Folder}";
+            return warn;
+        }
+
         protected override void OnSucceeded(PullResult r)
         {
             if (!_calculations)
             {
-                // Variables (and dimensions) only: the row already shows the counts
+                // Variables (and dimensions), IPM: the rows already show the counts
                 MetadataResult only = r.Metadata;
-                bool warn = only != null && MetadataWarning(only);
-                SetHeadline(warn ? "Update complete, with warnings" : "Update complete", warn ? Color.DarkOrange : Color.DarkGreen);
-                SetSummary((warn ? (only.VariablesError ?? only.DimensionsError) + " (see details; the previous data is kept).\n"
-                                 : $"The variables{(_dimensions ? ", dimensions and members" : "")} are up to date.\n") +
-                           "The calculation scripts were left as they are.");
+                bool metaWarn = only != null && MetadataWarning(only);
+                bool warn = ShowIpm(r, out string ipmText) | metaWarn;
+                SetHeadline(warn ? (_metadata ? "Update complete, with warnings" : "Pull complete, with warnings")
+                                 : (_metadata ? "Update complete" : "Pull complete"),
+                            warn ? Color.DarkOrange : Color.DarkGreen);
+                string varsText = !_metadata ? ""
+                    : metaWarn ? (only.VariablesError ?? only.DimensionsError) + " (see details; the previous data is kept).\n"
+                    : $"The variables{(_dimensions ? ", dimensions and members" : "")} are up to date.\n";
+                SetSummary(varsText + "The calculation scripts were left as they are." + ipmText);
                 return;
             }
 
@@ -157,6 +191,7 @@ namespace CalcStudioEPM.Forms
                 SetStepState(cleanup, StepState.Warning, "could not remove it (see details)");
                 warnings = true;
             }
+            warnings |= ShowIpm(r, out string ipmSummary);
 
             SetHeadline(warnings ? "Pull complete, with warnings" : "Pull complete",
                         warnings ? Color.DarkOrange : Color.DarkGreen);
@@ -178,7 +213,7 @@ namespace CalcStudioEPM.Forms
                 : $"{r.Copied} scripts are ready in {r.ScriptsDir}" +
                   (r.Skipped > 0
                       ? $"\n{r.Skipped} artifacts could not be extracted — show details for the list."
-                      : "") + changes + metaText);
+                      : "") + changes + metaText + ipmSummary);
         }
     }
 }

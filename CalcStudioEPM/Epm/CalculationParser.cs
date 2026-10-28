@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -86,8 +87,11 @@ namespace CalcStudioEPM.Epm
             // Fresh start – remove old scripts so stale files don't linger
             // Only the files go; the folder tree stays (Folder as Workspace and Explorer just see
             // files change), the Folder as Workspace marker too. Folders left empty once the new
-            // scripts are written are removed at the end.
-            ReadOnlyScripts.ClearFiles(scriptsDir, Path.Combine(scriptsDir, PathConstants.WorkspaceSentinelName));
+            // scripts are written are removed at the end. The IPM folder is pulled on its own: kept.
+            string ipmDir = Path.Combine(scriptsDir, PathConstants.IpmDirName);
+            var keep = new List<string> { Path.Combine(scriptsDir, PathConstants.WorkspaceSentinelName) };
+            if (Directory.Exists(ipmDir)) keep.AddRange(Directory.EnumerateFiles(ipmDir, "*", SearchOption.AllDirectories));
+            ReadOnlyScripts.ClearFiles(scriptsDir, keep.ToArray());
             Directory.CreateDirectory(scriptsDir);
 
             // ---------------------------------------------------------------- //

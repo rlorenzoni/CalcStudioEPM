@@ -94,7 +94,11 @@ namespace NppPluginNET
             bool memberChar = ch >= 0x20 && ch < 0x10000 && ch != '"';   // may be typing a "member name" or alias
             if (!trigger && !memberChar) return;
             Script script = CurrentScript(out string path);
-            if (script == Script.None) return;
+            if (script == Script.None)
+            {
+                if (memberChar && IpmFiles.KindOf(path, out _) == IpmFiles.Kind.AutoPredict) IpmCompletion(sci, path);
+                return;
+            }
             if (script == Script.CalcScript && !PluginSettings.Current.AutoCompleteCalcScript) return;
             if (script == Script.Groovy && !PluginSettings.Current.AutoCompleteGroovy) return;
 
@@ -731,6 +735,66 @@ namespace NppPluginNET
             };
             _memberIndex = c;
             return c;
+        }
+
+        // ------------------------------------------------------------------ //
+        //  IPM: an Auto Predict job's .autopredict.ini
+        // ------------------------------------------------------------------ //
+
+        /// <summary>
+        /// An Auto Predict .ini: typing a value lists what belongs there — on a dimension's line (an
+        /// output's or driver's, or the Model Scope's) that dimension's members, in a member list
+        /// (Members =, Fitted values = …) every dimension's, after Calendar = the pulled calendars.
+        /// The item after the last comma is completed; the pick goes in as it is, without quotes.
+        /// </summary>
+        private static void IpmCompletion(IntPtr sci, string path)
+        {
+            if (!PluginSettings.Current.AutoCompleteCalcScript) return;
+            if (_kind == ListKind.Members && ScintillaText.Send(sci, SCI_AUTOCACTIVE) != 0)
+                ScintillaText.Send(sci, SCI_AUTOCCANCEL);   // rebuilt for the longer prefix (aliases)
+
+            int pos = ScintillaText.Send(sci, SCI_GETCURRENTPOS);
+            string before = ScintillaText.GetRange(sci, Math.Max(0, pos - 40000), pos);
+            string line = before.Substring(before.LastIndexOf('\n') + 1);
+            string t = line.TrimStart();
+            int eq = line.IndexOf('=');
+            if (t.StartsWith(";") || t.StartsWith("[") || eq < 0) return;
+            string key = line.Substring(0, eq).Trim();
+            string value = line.Substring(eq + 1);
+            int depth = 0, comma = -1;
+            bool quoted = false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (c == '"') quoted = !quoted;
+                else if (!quoted && (c == '(' || c == '[')) depth++;
+                else if (!quoted && (c == ')' || c == ']')) depth = Math.Max(0, depth - 1);
+                else if (!quoted && depth == 0 && c == ',') comma = i;
+            }
+            string prefix = value.Substring(comma + 1).TrimStart();
+            if (quoted || depth > 0 || prefix.Length == 0 || prefix.Length > 80 ||
+                prefix.IndexOfAny(new[] { '"', '(', ')', '{', '}', '[', ']', '&', '@' }) >= 0) return;
+
+            MatchCollection headers = Regex.Matches(before.Substring(0, before.Length - line.Length), @"(?m)^[ \t]*\[([^\]\r\n]*)\]");
+            string section = headers.Count > 0 ? headers[headers.Count - 1].Groups[1].Value.Trim() : "";
+            _memberOpen = "";
+            _memberClose = "";
+
+            if (string.Equals(key, "Calendar", StringComparison.OrdinalIgnoreCase))
+            {
+                ConnectionConfig cfg = ConnectionFor(path);
+                if (cfg == null) return;
+                List<string> names = IpmContext.For(cfg).Calendars.Select(c => c.Name)
+                    .Where(n => n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (names.Count == 0) return;
+                _memberPicks.Clear();
+                foreach (string n in names) _memberPicks[n] = n;
+                Show(sci, ListKind.Members, 0, names, '\n');
+                _memberStart = pos - ScintillaText.EncodingOf(sci).GetByteCount(prefix);
+                return;
+            }
+            if (!AutoPredictIni.IsMemberLine(section, key, out _dimension)) return;
+            ShowMembers(sci, path, prefix, inRuleCube: false);
         }
 
         // ------------------------------------------------------------------ //

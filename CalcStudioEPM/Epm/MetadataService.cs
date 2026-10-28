@@ -22,7 +22,8 @@ namespace CalcStudioEPM.Epm
     ///  • uservariables                                  — every pull
     ///  • plantypes → plantypes/{cube}/dimensions → plantypes/{cube}/dimensions/{dim}
     ///                                                   — when asked: each dimension's members
-    ///                                                     and aliases (each dimension once)
+    ///                                                     with every field Planning sends (ID,
+    ///                                                     alias, storage …)
     /// Failures never fail the pull: they are reported, and the previous files are kept
     /// (a dimension that fails keeps its previously downloaded members).
     /// </summary>
@@ -126,9 +127,9 @@ namespace CalcStudioEPM.Epm
                             await gate.WaitAsync().ConfigureAwait(false);
                             try
                             {
+                                // No fields filter: every field Planning has for a member is kept (ID included)
                                 string json = await client.GetLargeJsonAsync(
-                                    $"plantypes/{Uri.EscapeDataString(pr.Cube)}/dimensions/{Uri.EscapeDataString(pr.Dim)}" +
-                                    "?fields=name,alias,children").ConfigureAwait(false);
+                                    $"plantypes/{Uri.EscapeDataString(pr.Cube)}/dimensions/{Uri.EscapeDataString(pr.Dim)}").ConfigureAwait(false);
                                 var info = new EpmMetadata.DimensionInfo { Name = pr.Dim, DimType = pr.DimType, Density = pr.Density };
                                 Flatten(JObject.Parse(json), info, isRoot: true, parent: pr.Dim);
                                 info.Members = info.Members.Distinct(StringComparer.OrdinalIgnoreCase).ToList();   // shared members
@@ -177,20 +178,42 @@ namespace CalcStudioEPM.Epm
             return slot;
         }
 
-        /// <summary>Every member under a dimension node (the node itself is the dimension), with its parent.</summary>
+        /// <summary>Every member under a dimension node (the node itself is the dimension), with its
+        /// parent and the other fields Planning sent.</summary>
         private static void Flatten(JToken node, EpmMetadata.DimensionInfo info, bool isRoot, string parent)
         {
             string name = isRoot ? info.Name : (string)node["name"];
-            if (!isRoot && !string.IsNullOrEmpty(name))
+            if (isRoot) info.Fields = FieldsOf(node);
+            else if (!string.IsNullOrEmpty(name))
             {
                 info.Members.Add(name);
                 string alias = (string)node["alias"];
                 bool hasAlias = !string.IsNullOrEmpty(alias) && !string.Equals(alias, name, StringComparison.Ordinal);
                 if (hasAlias) info.Aliases.Add(alias);
-                info.Nodes.Add(new EpmMetadata.MemberNode { Name = name, Alias = hasAlias ? alias : null, Parent = parent });
+                info.Nodes.Add(new EpmMetadata.MemberNode { Name = name, Alias = hasAlias ? alias : null, Parent = parent, Fields = FieldsOf(node) });
             }
             foreach (JToken child in node["children"] ?? new JArray())
                 Flatten(child, info, isRoot: false, parent: name);
+        }
+
+        /// <summary>A node's fields as received, except those kept elsewhere (name, alias, children)
+        /// and empty ones; arrays and objects as compact JSON.</summary>
+        private static Dictionary<string, string> FieldsOf(JToken node)
+        {
+            if (!(node is JObject o)) return null;
+            var fields = new Dictionary<string, string>();
+            foreach (JProperty p in o.Properties())
+            {
+                if (p.Name == "name" || p.Name == "alias" || p.Name == "children") continue;
+                JToken v = p.Value;
+                if (v == null || v.Type == JTokenType.Null || v.Type == JTokenType.Undefined) continue;
+                string text = v is JValue jv ? Convert.ToString(jv.Value, System.Globalization.CultureInfo.InvariantCulture)
+                                             : v.ToString(Newtonsoft.Json.Formatting.None);
+                if (v.Type == JTokenType.Boolean) text = text.ToLowerInvariant();
+                if (string.IsNullOrEmpty(text) || text == "[]" || text == "{}") continue;
+                fields[p.Name] = text;
+            }
+            return fields.Count > 0 ? fields : null;
         }
     }
 }

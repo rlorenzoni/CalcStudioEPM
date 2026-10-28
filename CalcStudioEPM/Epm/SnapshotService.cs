@@ -22,10 +22,12 @@ namespace CalcStudioEPM.Epm
     ///      .csc / .js script files.
     /// The substitution / user variables (and, when asked, dimensions) download in parallel
     /// from the start, with their own live status.
+    /// IPM (Auto Predict, calendars, events), when asked, is exported last as a package of its
+    /// own — after the metadata, whose member IDs name the members — see <see cref="IpmService"/>.
     /// </summary>
     /// <summary>User-facing stages of a pull, reported as each one starts. Metadata runs in
     /// parallel with the others; it is reported as a step only when the pull waits for it.</summary>
-    public enum PullStep { RequestExport, WaitForExport, Download, CleanUp, ExtractScripts, Metadata }
+    public enum PullStep { RequestExport, WaitForExport, Download, CleanUp, ExtractScripts, Metadata, Ipm }
 
     /// <summary>A pull that failed at <see cref="Step"/>; says whether the server snapshot
     /// was removed anyway.</summary>
@@ -61,6 +63,11 @@ namespace CalcStudioEPM.Epm
         public System.Collections.Generic.List<string> ChangedSincePull;
         /// <summary>When the previous pull was (UTC); with <see cref="ChangedSincePull"/>.</summary>
         public DateTime? PreviousPullUtc;
+
+        /// <summary>The IPM pull, when asked; <see cref="IpmError"/> says why it failed alongside
+        /// the calculations (on its own, a failure fails the pull).</summary>
+        public IpmPullResult Ipm;
+        public string IpmError;
     }
 
     public static class SnapshotService
@@ -87,10 +94,11 @@ namespace CalcStudioEPM.Epm
             IProgress<string> metadataStatus = null,
             Action<MetadataResult> metadataDone = null,
             bool includeCalculations = true,
-            bool includeMetadata = true)
+            bool includeMetadata = true,
+            bool includeIpm = false)
         {
             if (cfg == null) throw new ArgumentNullException(nameof(cfg));
-            if (!includeCalculations && !includeMetadata) throw new ArgumentException("Nothing to pull.");
+            if (!includeCalculations && !includeMetadata && !includeIpm) throw new ArgumentException("Nothing to pull.");
 
             var result = new PullResult();
 
@@ -107,10 +115,14 @@ namespace CalcStudioEPM.Epm
 
             if (!includeCalculations)
             {
-                // Only the dimensions and variables: no export, the scripts folder is left alone
-                steps?.Report(PullStep.Metadata);
-                result.Metadata = await metadata.ConfigureAwait(false);
-                progress?.Report("Variables" + (includeDimensions ? ", dimensions and members" : "") + " updated; the calculation scripts were left as they are.");
+                // No Calculation Manager export: the calculation scripts are left alone
+                if (includeMetadata)
+                {
+                    steps?.Report(PullStep.Metadata);
+                    result.Metadata = await metadata.ConfigureAwait(false);
+                    progress?.Report("Variables" + (includeDimensions ? ", dimensions and members" : "") + " updated; the calculation scripts were left as they are.");
+                }
+                if (includeIpm) await PullIpmAsync(cfg, result, progress, steps, alone: true).ConfigureAwait(false);
                 return result;
             }
 
@@ -281,11 +293,30 @@ namespace CalcStudioEPM.Epm
                 progress?.Report("Pull complete. All Calculation Manager scripts are up to date.");
             }
 
+            if (includeIpm) await PullIpmAsync(cfg, result, progress, steps, alone: false).ConfigureAwait(false);
             return result;
         }
 
+        /// <summary>The IPM export (its own snapshot). <paramref name="alone"/>: nothing else was
+        /// pulled, so a failure fails the pull; otherwise it is reported in the result.</summary>
+        private static async Task PullIpmAsync(ConnectionConfig cfg, PullResult result, IProgress<string> progress,
+                                               IProgress<PullStep> steps, bool alone)
+        {
+            steps?.Report(PullStep.Ipm);
+            try { result.Ipm = await IpmService.PullAsync(cfg, progress).ConfigureAwait(false); }
+            catch (Exception ex) when (!alone)
+            {
+                result.IpmError = ex.Message;
+                progress?.Report("[IPM] [WARN] " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                throw new PullException(PullStep.Ipm, ex.Message, null, ex);
+            }
+        }
+
         /// <summary>Deletes the snapshot; returns why it couldn't, or null when it was deleted.</summary>
-        private static async Task<string> DeleteSnapshotAsync(EpmClient client, string snapshotName, IProgress<string> progress)
+        internal static async Task<string> DeleteSnapshotAsync(EpmClient client, string snapshotName, IProgress<string> progress)
         {
             progress?.Report($"Deleting server snapshot '{snapshotName}'…");
             try
@@ -307,7 +338,7 @@ namespace CalcStudioEPM.Epm
         /// Asks EPM Cloud for the snapshot file, waits until it is ready, saves it as
         /// <paramref name="tempZip"/> and checks it is a ZIP. Throws on any failure.
         /// </summary>
-        private static async Task DownloadSnapshotAsync(EpmClient client, string snapshotName, string tempZip, IProgress<string> progress)
+        internal static async Task DownloadSnapshotAsync(EpmClient client, string snapshotName, string tempZip, IProgress<string> progress)
         {
             progress?.Report($"Requesting download of '{snapshotName}.zip'…");
             MigrationExportResponse downloadResp;
