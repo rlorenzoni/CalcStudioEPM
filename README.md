@@ -49,7 +49,7 @@ The plugin installs as `plugins\CalcStudioEPM\CalcStudioEPM.dll` and keeps its s
 
 **Dimension Navigator** (menu and toolbar) browses the dimensions downloaded on Pull, without going to EPM. It stays open next to the script.
 - **Browse:** pick a cube and a dimension, then walk that cube's hierarchy ("(all cubes)" shows the union), which loads as you expand so large dimensions stay fast. Shared members show in grey.
-- **Search:** find members by name or alias.
+- **Search:** finds members whose name, alias or UDAs contain what you type (any part, any case), or a pasted member ID. The results list each member's UDAs. UDAs need dimensions downloaded with this version.
 - **Details:** alias, parent, full path, children, level 0, shared positions, and the cubes that use the dimension.
 - **Insert:** double-click or Insert puts the member, quoted by default, at the cursor.
 

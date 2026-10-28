@@ -13,9 +13,9 @@ namespace CalcStudioEPM.Forms
     /// <summary>
     /// Browse the dimensions and members downloaded on Pull: pick a cube and a dimension,
     /// walk the hierarchy (loaded as nodes are expanded, so large dimensions stay fast),
-    /// search names, aliases and member IDs, see a member's parent, path, children, shared
-    /// positions and every field Planning sent for it (ID, storage …), and insert it at the
-    /// cursor. Modeless: it stays open next to the script.
+    /// search any part of names, aliases and UDAs (or a pasted member ID), see a member's
+    /// parent, path, children, shared positions and every field Planning sent for it (ID,
+    /// storage …), and insert it at the cursor. Modeless: it stays open next to the script.
     /// </summary>
     public class DimensionNavigatorForm : PluginForm
     {
@@ -102,6 +102,7 @@ namespace CalcStudioEPM.Forms
             _results.Columns.Add("Alias", 130);
             _results.Columns.Add("Dimension", 90);
             _results.Columns.Add("Parent", 110);
+            _results.Columns.Add("UDAs", 110);
             _results.SelectedIndexChanged += (s, e) =>
             {
                 if (_results.SelectedItems.Count > 0 && _results.SelectedItems[0].Tag is NodeRef r) { ShowDetails(r); Reveal(r); }
@@ -353,19 +354,21 @@ namespace CalcStudioEPM.Forms
                         : d.Members.Select(m => new EpmMetadata.MemberNode { Name = m, Parent = d.Name });
                     foreach (var n in pool)
                     {
+                        string udas = Udas(n);
                         bool hit = n.Name.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
                                    (n.Alias != null && n.Alias.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                   udas.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0 ||
                                    string.Equals(n.Id, q, StringComparison.OrdinalIgnoreCase);   // a pasted member ID
                         if (!hit) continue;
                         if (++found > MaxResults) break;
-                        _results.Items.Add(new ListViewItem(new[] { n.Name, n.Alias ?? "", d.Name, n.Parent ?? "" })
+                        _results.Items.Add(new ListViewItem(new[] { n.Name, n.Alias ?? "", d.Name, n.Parent ?? "", udas })
                         {
                             Tag = new NodeRef { Dim = d, Node = n },
                         });
                     }
                     if (found > MaxResults) break;
                 }
-                _lblStatus.Text = found == 0 ? $"No member, alias or member ID matches \"{q}\"."
+                _lblStatus.Text = found == 0 ? $"No member, alias, UDA or member ID matches \"{q}\"."
                                 : found > MaxResults ? $"More than {MaxResults} matches — showing the first {MaxResults}. Type more to narrow it."
                                 : $"{found} match{(found == 1 ? "" : "es")} for \"{q}\".";
             }
@@ -373,6 +376,19 @@ namespace CalcStudioEPM.Forms
             {
                 _results.EndUpdate();
             }
+        }
+
+        private readonly Dictionary<EpmMetadata.MemberNode, string> _udas = new Dictionary<EpmMetadata.MemberNode, string>();
+
+        /// <summary>The member's UDAs, "Hsp_Currency, HSP_NOLINK" (Planning sends them as a JSON
+        /// list); "" when it has none or the dimensions were downloaded without them.</summary>
+        private string Udas(EpmMetadata.MemberNode n)
+        {
+            if (n.Fields == null || !n.Fields.TryGetValue("udas", out string raw)) return "";
+            if (_udas.TryGetValue(n, out string shown)) return shown;
+            try { shown = string.Join(", ", Newtonsoft.Json.Linq.JArray.Parse(raw).Select(t => (string)t)); }
+            catch { shown = raw; }
+            return _udas[n] = shown;
         }
 
         // ------------------------------------------------------------------ //

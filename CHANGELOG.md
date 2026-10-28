@@ -30,8 +30,8 @@ DLL's file version is `0.15.N.0`.
   when a connection's Read only box is unticked.
 - **Member IDs and properties:** the dimension download keeps every field Planning sends for a
   member (its ID, storage, formula …), shown under *From EPM* in the Dimension Navigator's
-  details; the navigator's search also finds a pasted member ID. Pull dimensions and members
-  again to get them.
+  details; the navigator's search also finds a pasted member ID, and any part of a member's
+  UDAs (shown in a new UDAs column). Pull dimensions and members again to get them.
 
 - **Update check:** *Check for updates* in the About box asks GitHub for the latest release, and
   at startup (at most once a day) a newer release is announced once, with a link to its page.
